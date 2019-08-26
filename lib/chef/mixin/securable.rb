@@ -24,7 +24,7 @@ class Chef
         set_or_return(
           :owner,
           arg,
-          :regex => Chef::Config[:user_valid_regex]
+          regex: Chef::Config[:user_valid_regex]
         )
       end
 
@@ -34,7 +34,7 @@ class Chef
         set_or_return(
           :group,
           arg,
-          :regex => Chef::Config[:group_valid_regex]
+          regex: Chef::Config[:group_valid_regex]
         )
       end
 
@@ -42,9 +42,9 @@ class Chef
         set_or_return(
           :mode,
           arg,
-          :callbacks => {
+          callbacks: {
             "not in valid numeric range" => lambda do |m|
-              if m.kind_of?(String)
+              if m.is_a?(String)
                 m =~ /^0/ || m = "0#{m}"
               end
 
@@ -59,17 +59,14 @@ class Chef
         )
       end
 
-      #==WindowsMacros
       # Defines methods for adding attributes to a chef resource to describe
       # Windows file security metadata.
       #
       # This module is meant to be used to extend a class (instead of
       # `include`-ing). A class is automatically extended with this module when
       # it includes WindowsSecurableAttributes.
-      # --
-      # TODO should this be separated into different files?
+      # @todo should this be separated into different files?
       module WindowsMacros
-        # === rights_attribute
         # "meta-method" for dynamically creating rights attributes on resources.
         #
         # Multiple rights attributes can be declared. This enables resources to
@@ -113,16 +110,16 @@ class Chef
             rights = instance_variable_get("@#{name}".to_sym)
             unless permissions.nil?
               input = {
-                :permissions => permissions,
-                :principals => principals,
+                permissions: permissions,
+                principals: principals,
               }
               input.merge!(args_hash) unless args_hash.nil?
 
-              validations = { :permissions => { :required => true },
-                              :principals => { :required => true, :kind_of => [String, Array] },
-                              :applies_to_children => { :equal_to => [ true, false, :containers_only, :objects_only ] },
-                              :applies_to_self => { :kind_of => [ TrueClass, FalseClass ] },
-                              :one_level_deep => { :kind_of => [ TrueClass, FalseClass ] },
+              validations = { permissions: { required: true },
+                              principals: { required: true, kind_of: [String, Array] },
+                              applies_to_children: { equal_to: [ true, false, :containers_only, :objects_only ] },
+                              applies_to_self: { kind_of: [ TrueClass, FalseClass ] },
+                              one_level_deep: { kind_of: [ TrueClass, FalseClass ] },
                             }
               validate(input, validations)
 
@@ -131,13 +128,13 @@ class Chef
                   if permission < 0 || permission > 1 << 32
                     raise ArgumentError, "permissions flags must be positive and <= 32 bits (#{permission})"
                   end
-                elsif !([:full_control, :modify, :read_execute, :read, :write].include?(permission.to_sym))
+                elsif !(%i{full_control modify read_execute read write}.include?(permission.to_sym))
                   raise ArgumentError, "permissions parameter must be :full_control, :modify, :read_execute, :read, :write or an integer representing Windows permission flags"
                 end
               end
 
               [ principals ].flatten.each do |principal|
-                if !principal.is_a?(String)
+                unless principal.is_a?(String)
                   raise ArgumentError, "principals parameter must be a string or array of strings representing usernames"
                 end
               end
@@ -162,7 +159,6 @@ class Chef
         end
       end
 
-      #==WindowsSecurableAttributes
       # Defines #inherits to describe Windows file security ACLs on the
       # including class
       module WindowsSecurableAttributes
@@ -171,7 +167,7 @@ class Chef
           set_or_return(
             :inherits,
             arg,
-            :kind_of => [ TrueClass, FalseClass ]
+            kind_of: [ TrueClass, FalseClass ]
           )
         end
       end

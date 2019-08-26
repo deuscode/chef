@@ -17,14 +17,19 @@
 # limitations under the License.
 #
 
+require_relative "../resource"
+require_relative "../dist"
+
 class Chef
   class Resource
     class Ohai < Chef::Resource
       resource_name :ohai
       provides :ohai
 
-      property :ohai_name, name_property: true
-      property :plugin, [String]
+      description "Use the ohai resource to reload the Ohai configuration on a node. This allows recipes that change system attributes (like a recipe that adds a user) to refer to those attributes later on during the #{Chef::Dist::CLIENT} run."
+
+      property :plugin, String,
+        description: "The name of an Ohai plugin to be reloaded. If this property is not specified, #{Chef::Dist::PRODUCT} will reload all plugins."
 
       default_action :reload
       allowed_actions :reload

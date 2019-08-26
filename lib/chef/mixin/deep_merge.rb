@@ -30,8 +30,8 @@ class Chef
       extend self
 
       def merge(first, second)
-        first  = Mash.new(first)  unless first.kind_of?(Mash)
-        second = Mash.new(second) unless second.kind_of?(Mash)
+        first  = Mash.new(first)  unless first.is_a?(Mash)
+        second = Mash.new(second) unless second.is_a?(Mash)
 
         DeepMerge.deep_merge(second, first)
       end
@@ -62,9 +62,9 @@ class Chef
         when nil
           dest
         when Hash
-          if dest.kind_of?(Hash)
+          if dest.is_a?(Hash)
             source.each do |src_key, src_value|
-              if dest[src_key]
+              if dest.key?(src_key)
                 dest[src_key] = deep_merge!(src_value, dest[src_key])
               else # dest[src_key] doesn't exist so we take whatever source has
                 dest[src_key] = src_value
@@ -74,7 +74,7 @@ class Chef
             dest = source
           end
         when Array
-          if dest.kind_of?(Array)
+          if dest.is_a?(Array)
             dest |= source
           else
             dest = source
@@ -103,10 +103,10 @@ class Chef
       # values when there is a conflict.
       def hash_only_merge!(merge_onto, merge_with)
         # If there are two Hashes, recursively merge.
-        if merge_onto.kind_of?(Hash) && merge_with.kind_of?(Hash)
+        if merge_onto.is_a?(Hash) && merge_with.is_a?(Hash)
           merge_with.each do |key, merge_with_value|
             value =
-              if merge_onto.has_key?(key)
+              if merge_onto.key?(key)
                 hash_only_merge(merge_onto[key], merge_with_value)
               else
                 merge_with_value

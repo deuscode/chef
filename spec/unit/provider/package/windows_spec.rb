@@ -50,7 +50,7 @@ describe Chef::Provider::Package::Windows, :windows_only do
       before(:each) do
         allow(Chef::Util::PathHelper).to receive(:validate_path)
         allow(provider).to receive(:package_provider).and_return(double("package_provider",
-          :installed_version => "1.0", :package_version => "2.0"))
+          installed_version: "1.0", package_version: "2.0"))
       end
 
       it "creates a current resource with the name of the new resource" do
@@ -224,7 +224,7 @@ describe Chef::Provider::Package::Windows, :windows_only do
         end
       end
 
-      context "eninstall entries is empty" do
+      context "uninstall entries is empty" do
         before { allow(Chef::Provider::Package::Windows::RegistryUninstallEntry).to receive(:find_entries).and_return([]) }
 
         it "returns nil" do
@@ -360,6 +360,7 @@ describe Chef::Provider::Package::Windows, :windows_only do
         before do
           new_resource.version("5.5.5")
           allow(provider).to receive(:current_version_array).and_return([ ["5.5.0", "4.3.0", "1.1.1"] ])
+          allow(provider).to receive(:version_compare).and_return(false)
         end
 
         it "installs given version" do
@@ -394,6 +395,25 @@ describe Chef::Provider::Package::Windows, :windows_only do
         end
       end
     end
+
+    context "a missing local file is given" do
+      let(:resource_source) { "C:/a_missing_file.exe" }
+      let(:installer_type) { nil }
+      before do
+        allow(::File).to receive(:exist?).with(provider.new_resource.source).and_return(false)
+        provider.load_current_resource
+      end
+
+      it "raises a Package error" do
+        expect { provider.run_action(:install) }.to raise_error(Chef::Exceptions::Package)
+      end
+
+      it "why_run mode doesn't raise an error" do
+        Chef::Config[:why_run] = true
+        expect { provider.run_action(:install) }.not_to raise_error
+        Chef::Config[:why_run] = false
+      end
+    end
   end
 
   shared_context "valid checksum" do
@@ -416,7 +436,8 @@ describe Chef::Provider::Package::Windows, :windows_only do
 
       it "raises the checksum mismatch exception" do
         expect { provider.send(:validate_content!) }.to raise_error(
-          Chef::Exceptions::ChecksumMismatch)
+          Chef::Exceptions::ChecksumMismatch
+        )
       end
     end
   end

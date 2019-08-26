@@ -17,13 +17,16 @@
 # limitations under the License.
 #
 
-require "chef/resource"
+require_relative "../resource"
+require_relative "../provider/cron" # do not remove. we actually need this below
 
 class Chef
   class Resource
     class Cron < Chef::Resource
+      resource_name :cron
+      provides :cron
 
-      identity_attr :command
+      description "Use the cron resource to manage cron entries for time-based job scheduling. Properties for a schedule will default to * if not provided. The cron resource requires access to a crontab program, typically cron."
 
       state_attrs :minute, :hour, :day, :month, :weekday, :user
 
@@ -37,14 +40,6 @@ class Chef
         @day = "*"
         @month = "*"
         @weekday = "*"
-        @command = nil
-        @user = "root"
-        @mailto = nil
-        @path = nil
-        @shell = nil
-        @home = nil
-        @time = nil
-        @environment = {}
       end
 
       def minute(arg = nil)
@@ -60,7 +55,7 @@ class Chef
         set_or_return(
           :minute,
           converted_arg,
-          :kind_of => String
+          kind_of: String
         )
       end
 
@@ -77,7 +72,7 @@ class Chef
         set_or_return(
           :hour,
           converted_arg,
-          :kind_of => String
+          kind_of: String
         )
       end
 
@@ -94,7 +89,7 @@ class Chef
         set_or_return(
           :day,
           converted_arg,
-          :kind_of => String
+          kind_of: String
         )
       end
 
@@ -111,7 +106,7 @@ class Chef
         set_or_return(
           :month,
           converted_arg,
-          :kind_of => String
+          kind_of: String
         )
       end
 
@@ -135,77 +130,40 @@ class Chef
         set_or_return(
           :weekday,
           converted_arg,
-          :kind_of => [String, Symbol]
+          kind_of: [String, Symbol]
         )
       end
 
-      def time(arg = nil)
-        set_or_return(
-          :time,
-          arg,
-          :equal_to => Chef::Provider::Cron::SPECIAL_TIME_VALUES
-        )
-      end
+      property :time, Symbol,
+        description: "A time interval. Possible values: :annually, :daily, :hourly, :midnight, :monthly, :reboot, :weekly, or :yearly.",
+        equal_to: Chef::Provider::Cron::SPECIAL_TIME_VALUES
 
-      def mailto(arg = nil)
-        set_or_return(
-          :mailto,
-          arg,
-          :kind_of => String
-        )
-      end
+      property :mailto, String,
+        description: "Set the MAILTO environment variable."
 
-      def path(arg = nil)
-        set_or_return(
-          :path,
-          arg,
-          :kind_of => String
-        )
-      end
+      property :path, String,
+        description: "Set the PATH environment variable."
 
-      def home(arg = nil)
-        set_or_return(
-          :home,
-          arg,
-          :kind_of => String
-        )
-      end
+      property :home, String,
+        description: "Set the HOME environment variable."
 
-      def shell(arg = nil)
-        set_or_return(
-          :shell,
-          arg,
-          :kind_of => String
-        )
-      end
+      property :shell, String,
+        description: "Set the SHELL environment variable."
 
-      def command(arg = nil)
-        set_or_return(
-          :command,
-          arg,
-          :kind_of => String
-        )
-      end
+      property :command, String,
+        description: "The command to be run, or the path to a file that contains the command to be run.",
+        identity: true
 
-      def user(arg = nil)
-        set_or_return(
-          :user,
-          arg,
-          :kind_of => String
-        )
-      end
+      property :user, String,
+        description: "The name of the user that runs the command. If the user property is changed, the original user for the crontab program continues to run until that crontab program is deleted. This property is not applicable on the AIX platform.",
+        default: "root"
 
-      def environment(arg = nil)
-        set_or_return(
-          :environment,
-          arg,
-          :kind_of => Hash
-        )
-      end
+      property :environment, Hash,
+        description: "A Hash of environment variables in the form of ({'ENV_VARIABLE' => 'VALUE'}).",
+        default: lazy { {} }
 
       private
 
-      # On Ruby 1.8, Kernel#Integer will happily do this for you. On 1.9, no.
       def integerize(integerish)
         Integer(integerish)
       rescue TypeError

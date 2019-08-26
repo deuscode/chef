@@ -57,17 +57,17 @@ describe Chef::ChefFS::FileSystem do
   context "with a populated filesystem" do
     let(:fs) do
       memory_fs("", {
-        :a => {
-          :aa => {
-            :c => "",
-            :zz => "",
+        a: {
+          aa: {
+            c: "",
+            zz: "",
           },
-          :ab => {
-            :c => "",
+          ab: {
+            c: "",
           },
         },
-        :x => "",
-        :y => {},
+        x: "",
+        y: {},
       })
     end
     context "list" do
@@ -140,7 +140,7 @@ describe Chef::ChefFS::FileSystem do
       it "is empty /y" do
         expect(Chef::ChefFS::FileSystem.resolve_path(fs, "/y").empty?).to be true
       end
-      it 'is not a directory and can\'t be tested /x' do
+      it "is not a directory and can't be tested /x" do
         expect { Chef::ChefFS::FileSystem.resolve_path(fs, "/x").empty? }.to raise_error(NoMethodError)
       end
     end

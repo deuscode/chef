@@ -16,8 +16,9 @@
 # limitations under the License.
 #
 
-require "chef/knife"
-require "chef/knife/core/node_presenter"
+require_relative "../knife"
+require_relative "core/node_presenter"
+require_relative "../dist"
 
 class Chef
   class Knife
@@ -27,21 +28,21 @@ class Chef
       include Knife::Core::MultiAttributeReturnOption
 
       deps do
-        require "chef/node"
-        require "chef/json_compat"
+        require_relative "../node"
+        require_relative "../json_compat"
       end
 
       banner "knife node show NODE (options)"
 
       option :run_list,
-        :short => "-r",
-        :long => "--run-list",
-        :description => "Show only the run list"
+        short: "-r",
+        long: "--run-list",
+        description: "Show only the run list."
 
       option :environment,
-        :short        => "-E",
-        :long         => "--environment",
-        :description  => "Show only the Chef environment"
+        short: "-E",
+        long: "--environment",
+        description: "Show only the #{Chef::Dist::PRODUCT} environment."
 
       def run
         ui.use_presenter Knife::Core::NodePresenter

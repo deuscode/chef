@@ -1,5 +1,5 @@
 #
-# Copyright 2012-2017, Chef Software Inc.
+# Copyright 2012-2018, Chef Software Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,11 +15,11 @@
 #
 
 name "chef"
-friendly_name "Chef Client"
+friendly_name "Chef Infra Client"
 maintainer "Chef Software, Inc. <maintainers@chef.io>"
 homepage "https://www.chef.io"
-license "Apache-2.0"
-license_file "../LICENSE"
+license "Chef EULA"
+license_file "CHEF-EULA.md"
 
 build_iteration 1
 # Do not use __FILE__ after this point, use current_file. If you use __FILE__
@@ -46,7 +46,13 @@ overrides_path = File.expand_path("../../../../omnibus_overrides.rb", current_fi
 instance_eval(IO.read(overrides_path), overrides_path)
 
 dependency "preparation"
+
 dependency "chef"
+
+#
+# addons which require omnibus software defns (not direct deps of chef itself - RFC-063)
+#
+dependency "nokogiri" # (nokogiri cannot go in the Gemfile, see wall of text in the software defn)
 
 # FIXME?: might make sense to move dependencies below into the omnibus-software chef
 #  definition or into a chef-complete definition added to omnibus-software.
@@ -62,13 +68,12 @@ if windows?
   dependency "ruby-windows-devkit-bash"
 end
 
+dependency "ruby-cleanup"
+
 package :rpm do
   signing_passphrase ENV["OMNIBUS_RPM_SIGNING_PASSPHRASE"]
-
-  unless rhel? && platform_version.satisfies?("< 6")
-    compression_level 1
-    compression_type :xz
-  end
+  compression_level 1
+  compression_type :xz
 end
 
 package :deb do
@@ -90,11 +95,11 @@ package :msi do
   upgrade_code msi_upgrade_code
   wix_candle_extension "WixUtilExtension"
   wix_light_extension "WixUtilExtension"
-  signing_identity "F74E1A68005E8A9C465C3D2FF7B41F3988F0EA09", machine_store: true
+  signing_identity "AF21BA8C9E50AE20DA9907B6E2D4B0CC3306CA03", machine_store: true
   parameters ChefLogDllPath: windows_safe_path(gem_path("chef-[0-9]*-mingw32/ext/win32-eventlog/chef-log.dll")),
              ProjectLocationDir: project_location_dir
 end
 
 package :appx do
-  signing_identity "F74E1A68005E8A9C465C3D2FF7B41F3988F0EA09", machine_store: true
+  signing_identity "AF21BA8C9E50AE20DA9907B6E2D4B0CC3306CA03", machine_store: true
 end

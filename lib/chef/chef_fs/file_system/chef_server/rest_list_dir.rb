@@ -16,9 +16,9 @@
 # limitations under the License.
 #
 
-require "chef/chef_fs/file_system/base_fs_dir"
-require "chef/chef_fs/file_system/chef_server/rest_list_entry"
-require "chef/chef_fs/file_system/exceptions"
+require_relative "../base_fs_dir"
+require_relative "rest_list_entry"
+require_relative "../exceptions"
 
 class Chef
   module ChefFS
@@ -77,7 +77,7 @@ class Chef
             end
           rescue Timeout::Error => e
             raise Chef::ChefFS::FileSystem::OperationFailedError.new(:children, self, e, "Timeout retrieving children: #{e}")
-          rescue Net::HTTPServerException => e
+          rescue Net::HTTPClientException => e
             # 404 = NotFoundError
             if $!.response.code == "404"
 
@@ -90,10 +90,11 @@ class Chef
                   root.get_json(parent.api_path)
                   # Return empty list if the organization exists but /policies didn't work
                   []
-                rescue Net::HTTPServerException => e
+                rescue Net::HTTPClientException => e
                   if e.response.code == "404"
                     raise Chef::ChefFS::FileSystem::NotFoundError.new(self, $!)
                   end
+
                   raise Chef::ChefFS::FileSystem::OperationFailedError.new(:children, self, e, "HTTP error retrieving children: #{e}")
                 end
               else
@@ -133,7 +134,7 @@ class Chef
               rest.post(api_path, object)
             rescue Timeout::Error => e
               raise Chef::ChefFS::FileSystem::OperationFailedError.new(:create_child, self, e, "Timeout creating '#{name}': #{e}")
-            rescue Net::HTTPServerException => e
+            rescue Net::HTTPClientException => e
               # 404 = NotFoundError
               if e.response.code == "404"
                 raise Chef::ChefFS::FileSystem::NotFoundError.new(self, e)

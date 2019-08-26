@@ -20,21 +20,21 @@ require "spec_helper"
 
 describe Chef::Resource::Python do
 
-  before(:each) do
-    @resource = Chef::Resource::Python.new("fakey_fakerton")
+  let(:resource) { Chef::Resource::Python.new("fakey_fakerton") }
+
+  it "has a resource name of :python" do
+    expect(resource.resource_name).to eql(:python)
   end
 
-  it "should create a new Chef::Resource::Python" do
-    expect(@resource).to be_a_kind_of(Chef::Resource)
-    expect(@resource).to be_a_kind_of(Chef::Resource::Python)
+  it "has an interpreter of python" do
+    expect(resource.interpreter).to eql("python")
   end
 
-  it "should have a resource name of :python" do
-    expect(@resource.resource_name).to eql(:python)
+  it "sets the default action as :run" do
+    expect(resource.action).to eql([:run])
   end
 
-  it "should have an interpreter of python" do
-    expect(@resource.interpreter).to eql("python")
+  it "supports :run action" do
+    expect { resource.action :run }.not_to raise_error
   end
-
 end

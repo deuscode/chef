@@ -16,10 +16,10 @@
 # limitations under the License.
 #
 
-require "chef/file_content_management/deploy/cp"
-require "chef/file_content_management/deploy/mv_unix"
+require_relative "deploy/cp"
+require_relative "deploy/mv_unix"
 if Chef::Platform.windows?
-  require "chef/file_content_management/deploy/mv_windows"
+  require_relative "deploy/mv_windows"
 end
 
 class Chef
@@ -27,9 +27,9 @@ class Chef
     class Deploy
       def self.strategy(atomic_update)
         if atomic_update
-          Chef::Platform.windows? ? MvWindows.new() : MvUnix.new()
+          Chef::Platform.windows? ? MvWindows.new : MvUnix.new
         else
-          Cp.new()
+          Cp.new
         end
       end
     end

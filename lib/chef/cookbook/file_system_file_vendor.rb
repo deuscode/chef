@@ -1,4 +1,3 @@
-#--
 # Author:: Christopher Walters (<cw@chef.io>)
 # Author:: Tim Hinderliter (<tim@chef.io>)
 # Copyright:: Copyright 2010-2016, Chef Software Inc.
@@ -17,7 +16,7 @@
 # limitations under the License.
 #
 
-require "chef/cookbook/file_vendor"
+require_relative "file_vendor"
 
 class Chef
   class Cookbook
@@ -48,8 +47,9 @@ class Chef
       # Chef::Config.cookbook_path file hierarchy for the requested
       # file.
       def get_filename(filename)
-        location = File.join(cookbooks[cookbook_name].root_dir, filename) if cookbooks.has_key?(cookbook_name)
+        location = File.join(cookbooks[cookbook_name].root_dir, filename) if cookbooks.key?(cookbook_name)
         raise "File #{filename} does not exist for cookbook #{cookbook_name}" unless location && File.exist?(location)
+
         location
       end
 

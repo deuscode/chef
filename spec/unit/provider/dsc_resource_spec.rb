@@ -27,7 +27,7 @@ describe Chef::Provider::DscResource do
     Chef::Provider::DscResource.new(resource, run_context)
   end
 
-  context "when Powershell does not support Invoke-DscResource" do
+  context "when PowerShell does not support Invoke-DscResource" do
     let (:node) do
       node = Chef::Node.new
       node.automatic[:languages][:powershell][:version] = "4.0"
@@ -36,11 +36,12 @@ describe Chef::Provider::DscResource do
     it "raises a ProviderNotFound exception" do
       expect(provider).not_to receive(:meta_configuration)
       expect { provider.run_action(:run) }.to raise_error(
-              Chef::Exceptions::ProviderNotFound, /5\.0\.10018\.0/)
+        Chef::Exceptions::ProviderNotFound, /5\.0\.10018\.0/
+      )
     end
   end
 
-  context "when Powershell supports Invoke-DscResource" do
+  context "when PowerShell supports Invoke-DscResource" do
 
     context "when RefreshMode is not set to Disabled" do
       context "and the WMF 5 is a preview release" do
@@ -52,7 +53,8 @@ describe Chef::Provider::DscResource do
         it "raises an exception" do
           expect(provider).to receive(:dsc_refresh_mode_disabled?).and_return(false)
           expect { provider.run_action(:run) }.to raise_error(
-            Chef::Exceptions::ProviderNotFound, /Disabled/)
+            Chef::Exceptions::ProviderNotFound, /Disabled/
+          )
         end
       end
       context "and the WMF is 5 RTM or newer" do
@@ -103,8 +105,8 @@ describe Chef::Provider::DscResource do
 
     it "flags the resource as reboot required when required" do
       expect(provider).to receive(:test_resource).and_return(false)
-      expect(provider).to receive(:invoke_resource).
-        and_return(double(:stdout => "", :return_value => nil))
+      expect(provider).to receive(:invoke_resource)
+        .and_return(double(stdout: "", return_value: nil))
       expect(provider).to receive(:add_dsc_verbose_log)
       expect(provider).to receive(:return_dsc_resource_result).and_return(true)
       expect(provider).to receive(:create_reboot_resource)
@@ -113,8 +115,8 @@ describe Chef::Provider::DscResource do
 
     it "does not flag the resource as reboot required when not required" do
       expect(provider).to receive(:test_resource).and_return(false)
-      expect(provider).to receive(:invoke_resource).
-        and_return(double(:stdout => "", :return_value => nil))
+      expect(provider).to receive(:invoke_resource)
+        .and_return(double(stdout: "", return_value: nil))
       expect(provider).to receive(:add_dsc_verbose_log)
       expect(provider).to receive(:return_dsc_resource_result).and_return(false)
       expect(provider).to_not receive(:create_reboot_resource)
@@ -155,9 +157,10 @@ describe Chef::Provider::DscResource do
       context "multiple resource are found" do
         let (:resource_records) do
           [
-          { "Module" => { "Name" => "ModuleName1" } },
-          { "Module" => { "Name" => "ModuleName2" } },
-        ] end
+          { "Module" => { "Name" => "ModuleName1", "Version" => "1.0.0.0" } },
+          { "Module" => { "Name" => "ModuleName1", "Version" => "2.0.0.0" } },
+        ]
+        end
 
         it "raises MultipleDscResourcesFound" do
           expect { provider.run_action(:run) }.to raise_error(Chef::Exceptions::MultipleDscResourcesFound)
@@ -293,12 +296,12 @@ describe Chef::Provider::DscResource do
       set_node_object
     end
 
-    let(:cmdlet) { double(:run! => nil) }
+    let(:cmdlet) { double(run!: nil) }
 
     before(:each) do
       allow(provider).to receive(:translate_type).and_return("my_properties")
       provider.instance_variable_set(:@new_resource, double(
-        :properties => "my_properties", :resource => "my_resource", :timeout => 123
+        properties: "my_properties", resource: "my_resource", timeout: 123
       ))
     end
 

@@ -17,11 +17,12 @@
 # limitations under the License.
 #
 
-require "chef/mixin/wide_string"
-require "chef/win32/api/file"
-require "chef/win32/api/security"
-require "chef/win32/error"
-require "chef/win32/unicode"
+require_relative "../mixin/wide_string"
+require_relative "api/file"
+require_relative "api/security"
+require_relative "error"
+require_relative "unicode"
+require_relative "version"
 
 class Chef
   module ReservedNames::Win32
@@ -40,6 +41,7 @@ class Chef
       #
       def self.link(old_name, new_name)
         raise Errno::ENOENT, "(#{old_name}, #{new_name})" unless ::File.exist?(old_name) || ::File.symlink?(old_name)
+
         # TODO do a check for CreateHardLinkW and
         # raise NotImplemented exception on older Windows
         old_name = encode_path(old_name)
@@ -60,6 +62,7 @@ class Chef
         # TODO do a check for CreateSymbolicLinkW and
         # raise NotImplemented exception on older Windows
         flags = ::File.directory?(old_name) ? SYMBOLIC_LINK_FLAG_DIRECTORY : 0
+        flags |= SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE if Chef::ReservedNames::Win32::Version.new.win_10_creators_or_higher?
         old_name = encode_path(old_name)
         new_name = encode_path(new_name)
         unless CreateSymbolicLinkW(new_name, old_name, flags)
@@ -87,6 +90,14 @@ class Chef
         is_symlink
       end
 
+      def self.realpath(file_name)
+        if symlink?(file_name)
+          readlink(file_name)
+        else
+          file_name
+        end
+      end
+
       # Returns the path of the of the symbolic link referred to by +file+.
       #
       # Requires Windows Vista or later. On older versions of Windows it
@@ -94,6 +105,7 @@ class Chef
       #
       def self.readlink(link_name)
         raise Errno::ENOENT, link_name unless ::File.exists?(link_name) || ::File.symlink?(link_name)
+
         symlink_file_handle(link_name) do |handle|
           # Go to DeviceIoControl to get the symlink information
           # http://msdn.microsoft.com/en-us/library/windows/desktop/aa364571(v=vs.85).aspx
@@ -170,7 +182,8 @@ class Chef
           Chef::ReservedNames::Win32::Security::STANDARD_RIGHTS_READ
         token = Chef::ReservedNames::Win32::Security.open_process_token(
           Chef::ReservedNames::Win32::Process.get_current_process,
-          token_rights)
+          token_rights
+        )
         duplicate_token = token.duplicate_token(:SecurityImpersonation)
 
         mapping = Chef::ReservedNames::Win32::Security::GENERIC_MAPPING.new
@@ -180,7 +193,7 @@ class Chef
         mapping[:GenericAll] = Chef::ReservedNames::Win32::Security::FILE_ALL_ACCESS
 
         Chef::ReservedNames::Win32::Security.access_check(security_descriptor, duplicate_token,
-                                                          desired_access, mapping)
+          desired_access, mapping)
       end
 
       def self.delete_volume_mount_point(mount_point)
@@ -212,5 +225,5 @@ class Chef
   end
 end
 
-require "chef/win32/file/info"
-require "chef/win32/file/version_info"
+require_relative "file/info"
+require_relative "file/version_info"

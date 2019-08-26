@@ -16,6 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+require_relative "../../dist"
 
 class Chef
   module Formatters
@@ -43,7 +44,7 @@ class Chef
             error_description.section("Resource Declaration:", resource.sensitive ? "suppressed sensitive resource output" : recipe_snippet)
           end
 
-          error_description.section("Compiled Resource:", "#{resource.to_text}")
+          error_description.section("Compiled Resource:", (resource.to_text).to_s)
 
           # Template errors get wrapped in an exception class that can show the relevant template code,
           # so add them to the error output.
@@ -52,19 +53,21 @@ class Chef
           end
 
           if Chef::Platform.windows?
-            require "chef/win32/security"
+            require_relative "../../win32/security"
 
-            if !Chef::ReservedNames::Win32::Security.has_admin_privileges?
-              error_description.section("Missing Windows Admin Privileges", "chef-client doesn't have administrator privileges. This can be a possible reason for the resource failure.")
+            unless Chef::ReservedNames::Win32::Security.has_admin_privileges?
+              error_description.section("Missing Windows Admin Privileges", "#{Chef::Dist::CLIENT} doesn't have administrator privileges. This can be a possible reason for the resource failure.")
             end
           end
         end
 
         def recipe_snippet
           return nil if dynamic_resource?
+
           @snippet ||= begin
             if (file = parse_source) && (line = parse_line(file))
               return nil unless ::File.exists?(file)
+
               lines = IO.readlines(file)
 
               relevant_lines = ["# In #{file}\n\n"]

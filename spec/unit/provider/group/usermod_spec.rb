@@ -39,7 +39,7 @@ describe Chef::Provider::Group::Usermod do
       end
 
       it "should log an appropriate message" do
-        expect(@provider).not_to receive(:shell_out!)
+        expect(@provider).not_to receive(:shell_out_compacted!)
         @provider.modify_group_members
       end
     end
@@ -48,9 +48,6 @@ describe Chef::Provider::Group::Usermod do
       platforms = {
         "openbsd" => [ "-G" ],
         "netbsd" => [ "-G" ],
-        "solaris" => [ "-a", "-G" ],
-        "suse" => [ "-a", "-G" ],
-        "opensuse" => [ "-a", "-G" ],
         "smartos" => [ "-G" ],
         "omnios" => [ "-G" ],
       }
@@ -85,9 +82,9 @@ describe Chef::Provider::Group::Usermod do
           @provider.current_resource = current_resource
           @node.automatic_attrs[:platform] = platform
           @new_resource.append(true)
-          expect(@provider).to receive(:shell_out!).with("usermod", *flags, "wheel", "all")
-          expect(@provider).to receive(:shell_out!).with("usermod", *flags, "wheel", "your")
-          expect(@provider).to receive(:shell_out!).with("usermod", *flags, "wheel", "base")
+          expect(@provider).to receive(:shell_out_compacted!).with("usermod", *flags, "wheel", "all")
+          expect(@provider).to receive(:shell_out_compacted!).with("usermod", *flags, "wheel", "your")
+          expect(@provider).to receive(:shell_out_compacted!).with("usermod", *flags, "wheel", "base")
           @provider.modify_group_members
         end
       end

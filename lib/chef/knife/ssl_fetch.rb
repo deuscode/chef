@@ -16,19 +16,19 @@
 # limitations under the License.
 #
 
-require "chef/knife"
-require "chef/config"
+require_relative "../knife"
+require_relative "../config"
 
 class Chef
   class Knife
     class SslFetch < Chef::Knife
 
       deps do
-        require "pp"
-        require "socket"
-        require "uri"
-        require "openssl"
-        require "chef/mixin/proxified_socket"
+        require "pp" unless defined?(PP)
+        require "socket" unless defined?(Socket)
+        require "uri" unless defined?(URI)
+        require "openssl" unless defined?(OpenSSL)
+        require_relative "../mixin/proxified_socket"
         include Chef::Mixin::ProxifiedSocket
       end
 
@@ -41,7 +41,7 @@ class Chef
 
       def uri
         @uri ||= begin
-          Chef::Log.debug("Checking SSL cert on #{given_uri}")
+          Chef::Log.trace("Checking SSL cert on #{given_uri}")
           URI.parse(given_uri)
         end
       end
@@ -130,14 +130,14 @@ class Chef
 
       def run
         validate_uri
-        ui.warn(<<-TRUST_TRUST)
-Certificates from #{host} will be fetched and placed in your trusted_cert
-directory (#{trusted_certs_dir}).
+        ui.warn(<<~TRUST_TRUST)
+          Certificates from #{host} will be fetched and placed in your trusted_cert
+          directory (#{trusted_certs_dir}).
 
-Knife has no means to verify these are the correct certificates. You should
-verify the authenticity of these certificates after downloading.
+          Knife has no means to verify these are the correct certificates. You should
+          verify the authenticity of these certificates after downloading.
 
-TRUST_TRUST
+        TRUST_TRUST
         remote_cert_chain.each do |cert|
           write_cert(cert)
         end

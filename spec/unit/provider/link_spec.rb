@@ -22,14 +22,16 @@ require "ostruct"
 require "spec_helper"
 
 if Chef::Platform.windows?
-  require "chef/win32/file" #probably need this in spec_helper
+  require "chef/win32/file" # probably need this in spec_helper
 end
 
-describe Chef::Resource::Link, :not_supported_on_win2k3 do
+describe Chef::Resource::Link do
+  let(:logger) { double("Mixlib::Log::Child").as_null_object }
   let(:provider) do
     node = Chef::Node.new
     @events = Chef::EventDispatch::Dispatcher.new
     run_context = Chef::RunContext.new(node, {}, @events)
+    allow(run_context).to receive(:logger).and_return(logger)
     Chef::Provider::Link.new(new_resource, run_context)
   end
   let(:new_resource) do
@@ -44,7 +46,7 @@ describe Chef::Resource::Link, :not_supported_on_win2k3 do
 
   describe "when the target is a symlink" do
     before(:each) do
-      lstat = double("stats", :ino => 5)
+      lstat = double("stats", ino: 5)
       allow(lstat).to receive(:uid).and_return(501)
       allow(lstat).to receive(:gid).and_return(501)
       allow(lstat).to receive(:mode).and_return(0777)
@@ -144,7 +146,7 @@ describe Chef::Resource::Link, :not_supported_on_win2k3 do
 
   describe "when the target is a regular old file" do
     before do
-      stat = double("stats", :ino => 5)
+      stat = double("stats", ino: 5)
       allow(stat).to receive(:uid).and_return(501)
       allow(stat).to receive(:gid).and_return(501)
       allow(stat).to receive(:mode).and_return(0755)
@@ -176,7 +178,7 @@ describe Chef::Resource::Link, :not_supported_on_win2k3 do
 
     describe "and the source exists" do
       before do
-        stat = double("stats", :ino => 6)
+        stat = double("stats", ino: 6)
         allow(stat).to receive(:uid).and_return(502)
         allow(stat).to receive(:gid).and_return(502)
         allow(stat).to receive(:mode).and_return(0644)
@@ -203,7 +205,7 @@ describe Chef::Resource::Link, :not_supported_on_win2k3 do
 
     describe "and is hardlinked to the source" do
       before do
-        stat = double("stats", :ino => 5)
+        stat = double("stats", ino: 5)
         allow(stat).to receive(:uid).and_return(502)
         allow(stat).to receive(:gid).and_return(502)
         allow(stat).to receive(:mode).and_return(0644)
@@ -252,12 +254,13 @@ describe Chef::Resource::Link, :not_supported_on_win2k3 do
 
   describe "action_delete" do
     before(:each) do
-      stat = double("stats", :ino => 5)
+      stat = double("stats", ino: 5)
       allow(stat).to receive(:uid).and_return(501)
       allow(stat).to receive(:gid).and_return(501)
       allow(stat).to receive(:mode).and_return(0755)
       allow(provider.file_class).to receive(:stat).with(
-        "#{CHEF_SPEC_DATA}/fofile-link").and_return(stat)
+        "#{CHEF_SPEC_DATA}/fofile-link"
+      ).and_return(stat)
 
       provider.load_current_resource
     end
@@ -265,12 +268,13 @@ describe Chef::Resource::Link, :not_supported_on_win2k3 do
     shared_context "delete link to directories on Windows" do
       before do
         allow(::File).to receive(:directory?).with(
-          "#{CHEF_SPEC_DATA}/fofile-link").and_return(true)
+          "#{CHEF_SPEC_DATA}/fofile-link"
+        ).and_return(true)
       end
 
       it "invokes Dir.delete method to delete the link" do
         expect(::Dir).to receive(:delete).with(provider.new_resource.target_file)
-        expect(Chef::Log).to receive(:info).with("#{provider.new_resource} deleted")
+        expect(logger).to receive(:info).with("#{provider.new_resource} deleted")
         provider.run_action(:delete)
       end
     end
@@ -278,12 +282,13 @@ describe Chef::Resource::Link, :not_supported_on_win2k3 do
     shared_context "delete link to directories on Linux" do
       before do
         allow(::File).to receive(:directory?).with(
-          "#{CHEF_SPEC_DATA}/fofile-link").and_return(true)
+          "#{CHEF_SPEC_DATA}/fofile-link"
+        ).and_return(true)
       end
 
       it "invokes File.delete method to delete the link" do
         expect(::File).to receive(:delete).with(provider.new_resource.target_file)
-        expect(Chef::Log).to receive(:info).with("#{provider.new_resource} deleted")
+        expect(logger).to receive(:info).with("#{provider.new_resource} deleted")
         provider.run_action(:delete)
       end
     end
@@ -291,12 +296,13 @@ describe Chef::Resource::Link, :not_supported_on_win2k3 do
     shared_context "delete link to files" do
       before do
         allow(::File).to receive(:directory?).with(
-          "#{CHEF_SPEC_DATA}/fofile-link").and_return(false)
+          "#{CHEF_SPEC_DATA}/fofile-link"
+        ).and_return(false)
       end
 
       it "invokes File.delete method to delete the link" do
         expect(::File).to receive(:delete).with(provider.new_resource.target_file)
-        expect(Chef::Log).to receive(:info).with("#{provider.new_resource} deleted")
+        expect(logger).to receive(:info).with("#{provider.new_resource} deleted")
         provider.run_action(:delete)
       end
     end
@@ -304,9 +310,11 @@ describe Chef::Resource::Link, :not_supported_on_win2k3 do
     shared_context "soft links prerequisites" do
       before(:each) do
         allow(provider.file_class).to receive(:symlink?).with(
-          "#{CHEF_SPEC_DATA}/fofile-link").and_return(true)
+          "#{CHEF_SPEC_DATA}/fofile-link"
+        ).and_return(true)
         allow(provider.file_class).to receive(:readlink).with(
-          "#{CHEF_SPEC_DATA}/fofile-link").and_return("#{CHEF_SPEC_DATA}/fofile")
+          "#{CHEF_SPEC_DATA}/fofile-link"
+        ).and_return("#{CHEF_SPEC_DATA}/fofile")
       end
     end
 
@@ -319,21 +327,25 @@ describe Chef::Resource::Link, :not_supported_on_win2k3 do
       end
 
       before(:each) do
-        stat = double("stats", :ino => 5)
+        stat = double("stats", ino: 5)
         allow(stat).to receive(:uid).and_return(502)
         allow(stat).to receive(:gid).and_return(502)
         allow(stat).to receive(:mode).and_return(0644)
 
         allow(provider.file_class).to receive(:symlink?).with(
-          "#{CHEF_SPEC_DATA}/fofile-link").and_return(false)
+          "#{CHEF_SPEC_DATA}/fofile-link"
+        ).and_return(false)
 
         allow(File).to receive(:exists?).with(
-          "#{CHEF_SPEC_DATA}/fofile-link").and_return(true)
+          "#{CHEF_SPEC_DATA}/fofile-link"
+        ).and_return(true)
         allow(File).to receive(:exists?).with(
-          "#{CHEF_SPEC_DATA}/fofile").and_return(true)
+          "#{CHEF_SPEC_DATA}/fofile"
+        ).and_return(true)
 
         allow(provider.file_class).to receive(:stat).with(
-          "#{CHEF_SPEC_DATA}/fofile").and_return(stat)
+          "#{CHEF_SPEC_DATA}/fofile"
+        ).and_return(stat)
       end
     end
 
@@ -344,7 +356,8 @@ describe Chef::Resource::Link, :not_supported_on_win2k3 do
 
       before(:each) do
         allow(Chef::Resource::Link).to receive(:new).with(
-          provider.new_resource.name).and_return(resource_link)
+          provider.new_resource.name
+        ).and_return(resource_link)
         allow(resource_link).to receive(:verify_links_supported!)
         allow(Chef::Platform).to receive(:windows?).and_return(true)
       end

@@ -2,7 +2,7 @@
 # Author:: Adam Jacob (<adam@chef.io>)
 # Author:: Seth Falcon (<seth@chef.io>)
 # Author:: Kyle Goodwin (<kgoodwin@primerevenue.com>)
-# Copyright:: Copyright 2008-2017, Chef Software Inc.
+# Copyright:: Copyright 2008-2019, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +18,8 @@
 # limitations under the License.
 
 require "chef-config/exceptions"
+require_relative "dist"
+require_relative "constants"
 
 class Chef
   # == Chef::Exceptions
@@ -45,7 +47,7 @@ class Chef
     class SigInt < RuntimeError; end
     class SigTerm < RuntimeError; end
     class Cron < RuntimeError; end
-    class Env < RuntimeError; end
+    class WindowsEnv < RuntimeError; end
     class Exec < RuntimeError; end
     class Execute < RuntimeError; end
     class ErlCall < RuntimeError; end
@@ -99,6 +101,7 @@ class Chef
     # Cookbook loader used to raise an argument error when cookbook not found.
     # for back compat, need to raise an error that inherits from ArgumentError
     class CookbookNotFoundInRepo < ArgumentError; end
+    class CookbookMergingError < RuntimeError; end
     class RecipeNotFound < ArgumentError; end
     # AttributeNotFound really means the attribute file could not be found
     class AttributeNotFound < RuntimeError; end
@@ -130,7 +133,7 @@ class Chef
     # Can't find a Resource of this type that is valid on this platform.
     class NoSuchResourceType < NameError
       def initialize(short_name, node)
-        super "Cannot find a resource for #{short_name} on #{node[:platform]} version #{node[:platform_version]}"
+        super "Cannot find a resource for #{short_name} on #{node[:platform]} version #{node[:platform_version]} with target_mode? #{Chef::Config.target_mode?}"
       end
     end
 
@@ -262,14 +265,12 @@ class Chef
     end
 
     class MissingRole < RuntimeError
-      NULL = Object.new
-
       attr_reader :expansion
 
-      def initialize(message_or_expansion = NULL)
+      def initialize(message_or_expansion = NOT_PASSED)
         @expansion = nil
         case message_or_expansion
-        when NULL
+        when NOT_PASSED
           super()
         when String
           super
@@ -299,7 +300,7 @@ class Chef
 
       def client_run_failure(exception)
         set_backtrace(exception.backtrace)
-        @all_failures << [ "chef run", exception ]
+        @all_failures << [ "#{Chef::Dist::PRODUCT} run", exception ]
       end
 
       def notification_failure(exception)
@@ -398,9 +399,9 @@ class Chef
     # length declared in the http response.
     class ContentLengthMismatch < RuntimeError
       def initialize(response_length, content_length)
-        super <<-EOF
-Response body length #{response_length} does not match HTTP Content-Length header #{content_length}.
-This error is most often caused by network issues (proxies, etc) outside of chef-client.
+        super <<~EOF
+          Response body length #{response_length} does not match HTTP Content-Length header #{content_length}.
+          This error is most often caused by network issues (proxies, etc) outside of #{Chef::Dist::CLIENT}.
         EOF
       end
     end
@@ -442,26 +443,7 @@ This error is most often caused by network issues (proxies, etc) outside of chef
       end
     end
 
-    class AuditError < RuntimeError; end
-
-    class AuditControlGroupDuplicate < AuditError
-      def initialize(name)
-        super "Control group with name '#{name}' has already been defined"
-      end
-    end
-    class AuditNameMissing < AuditError; end
-    class NoAuditsProvided < AuditError
-      def initialize
-        super "You must provide a block with controls"
-      end
-    end
-    class AuditsFailed < AuditError
-      def initialize(num_failed, num_total)
-        super "Audit phase found failures - #{num_failed}/#{num_total} controls failed"
-      end
-    end
-
-    # If a converge or audit fails, we want to wrap the output from those errors into 1 error so we can
+    # If a converge fails, we want to wrap the output from those errors into 1 error so we can
     # see both issues in the output.  It is possible that nil will be provided.  You must call `fill_backtrace`
     # to correctly populate the backtrace with the wrapped backtraces.
     class RunFailedWrappingError < RuntimeError
@@ -510,16 +492,34 @@ This error is most often caused by network issues (proxies, etc) outside of chef
         @resources_found = resources_found
         matches_info = @resources_found.each do |r|
           if r["Module"].nil?
-            "Resource #{r['Name']} was found in #{r['Module']['Name']}"
+            "Resource #{r["Name"]} was found in #{r["Module"]["Name"]}"
           else
-            "Resource #{r['Name']} is a binary resource"
+            "Resource #{r["Name"]} is a binary resource"
           end
         end
-        super "Found multiple matching resources. #{matches_info.join("\n")}"
+        super "Found multiple resources matching #{matches_info[0]["Module"]["Name"]}:\n#{(matches_info.map { |f| f["Module"]["Version"] }).uniq.join("\n")}"
       end
     end
 
     # exception specific to invalid usage of 'dsc_resource' resource
     class DSCModuleNameMissing < ArgumentError; end
+
+    class GemRequirementConflict < RuntimeError
+      def initialize(gem_name, option, value1, value2)
+        super "Conflicting requirements for gem '#{gem_name}': Both #{value1.inspect} and #{value2.inspect} given for option #{option.inspect}"
+      end
+    end
+
+    class UnifiedModeImmediateSubscriptionEarlierResource < RuntimeError
+      def initialize(notification)
+        super "immediate subscription from #{notification.resource} resource cannot be setup to #{notification.notifying_resource} resource, which has already fired while in unified mode"
+      end
+    end
+
+    class UnifiedModeBeforeSubscriptionEarlierResource < RuntimeError
+      def initialize(notification)
+        super "before subscription from #{notification.resource} resource cannot be setup to #{notification.notifying_resource} resource, which has already fired while in unified mode"
+      end
+    end
   end
 end

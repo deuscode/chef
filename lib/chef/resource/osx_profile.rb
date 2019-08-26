@@ -16,59 +16,33 @@
 # limitations under the License.
 #
 
-require "chef/resource"
+require_relative "../resource"
 
 class Chef
   class Resource
     class OsxProfile < Chef::Resource
-      provides :osx_profile, os: "darwin"
-      provides :osx_config_profile, os: "darwin"
+      resource_name :osx_profile
+      provides :osx_profile
+      provides :osx_config_profile
 
-      identity_attr :profile_name
+      description "Use the osx_profile resource to manage configuration profiles (.mobileconfig files) on the macOS platform. The osx_profile resource installs profiles by using the uuidgen library to generate a unique ProfileUUID, and then using the profiles command to install the profile on the system."
+      introduced "12.7"
 
       default_action :install
       allowed_actions :install, :remove
 
-      def initialize(name, run_context = nil)
-        super
-        @profile_name = name
-        @profile = nil
-        @identifier = nil
-        @path = nil
-      end
+      property :profile_name, String,
+        description: "Use to specify the name of the profile, if different from the name of the resource block.",
+        name_property: true, identity: true
 
-      def profile_name(arg = nil)
-        set_or_return(
-          :profile_name,
-          arg,
-          :kind_of => [ String ]
-        )
-      end
+      property :profile, [ String, Hash ],
+        description: "Use to specify a profile. This may be the name of a profile contained in a cookbook or a Hash that contains the contents of the profile."
 
-      def profile(arg = nil)
-        set_or_return(
-          :profile,
-          arg,
-          :kind_of => [ String, Hash ]
-        )
-      end
+      property :identifier, String,
+        description: "Use to specify the identifier for the profile, such as com.company.screensaver."
 
-      def identifier(arg = nil)
-        set_or_return(
-          :identifier,
-          arg,
-          :kind_of => [ String ]
-        )
-      end
-
-      def path(arg = nil)
-        set_or_return(
-          :path,
-          arg,
-          :kind_of => [ String ]
-        )
-      end
-
+      property :path, String,
+        description: "The path to write the profile to disk before loading it."
     end
   end
 end

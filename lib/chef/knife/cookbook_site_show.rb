@@ -1,5 +1,6 @@
+#
 # Author:: Adam Jacob (<adam@chef.io>)
-# Copyright:: Copyright 2009-2016, Chef Software Inc.
+# Copyright:: Copyright 2009-2019, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,52 +16,25 @@
 # limitations under the License.
 #
 
-require "chef/knife"
+require_relative "../knife"
+require_relative "supermarket_show"
+require_relative "../dist"
 
 class Chef
   class Knife
-    class CookbookSiteShow < Knife
+    class CookbookSiteShow < Knife::SupermarketShow
+
+    # Handle the subclassing (knife doesn't do this :()
+      dependency_loaders.concat(superclass.dependency_loaders)
 
       banner "knife cookbook site show COOKBOOK [VERSION] (options)"
-      category "cookbook site"
-
-      option :supermarket_site,
-        :short => "-m SUPERMARKET_SITE",
-        :long => "--supermarket-site SUPERMARKET_SITE",
-        :description => "Supermarket Site",
-        :default => "https://supermarket.chef.io",
-        :proc => Proc.new { |supermarket| Chef::Config[:knife][:supermarket_site] = supermarket }
+      category "deprecated"
 
       def run
-        output(format_for_display(get_cookbook_data))
+        Chef::Log.warn("knife cookbook site show has been deprecated in favor of knife supermarket show. In #{Chef::Dist::PRODUCT} 16 (April 2020) this will result in an error!")
+        super
       end
 
-      def supermarket_uri
-        "#{config[:supermarket_site]}/api/v1"
-      end
-
-      def get_cookbook_data
-        case @name_args.length
-        when 1
-          noauth_rest.get("#{supermarket_uri}/cookbooks/#{@name_args[0]}")
-        when 2
-          noauth_rest.get("#{supermarket_uri}/cookbooks/#{@name_args[0]}/versions/#{name_args[1].tr('.', '_')}")
-        end
-      end
-
-      def get_cookbook_list(items = 10, start = 0, cookbook_collection = {})
-        cookbooks_url = "#{supermarket_uri}/cookbooks?items=#{items}&start=#{start}"
-        cr = noauth_rest.get(cookbooks_url)
-        cr["items"].each do |cookbook|
-          cookbook_collection[cookbook["cookbook_name"]] = cookbook
-        end
-        new_start = start + cr["items"].length
-        if new_start < cr["total"]
-          get_cookbook_list(items, new_start, cookbook_collection)
-        else
-          cookbook_collection
-        end
-      end
     end
   end
 end

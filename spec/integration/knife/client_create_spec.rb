@@ -33,18 +33,18 @@ describe "knife client create", :workstation do
 
     it "creates a new validator client" do
       knife("client create -k --validator bah").should_succeed stderr: out
-      knife("client show bah").should_succeed <<EOM
-admin:     false
-chef_type: client
-name:      bah
-validator: true
-EOM
+      knife("client show bah").should_succeed <<~EOM
+        admin:     false
+        chef_type: client
+        name:      bah
+        validator: true
+      EOM
     end
 
     it "refuses to add an existing client" do
       pending "Knife client create must not blindly overwrite an existing client"
       knife("client create -k bah").should_succeed stderr: out
-      expect { knife("client create -k bah") }.to raise_error(Net::HTTPServerException)
+      expect { knife("client create -k bah") }.to raise_error(Net::HTTPClientException)
     end
 
     it "saves the private key to a file" do

@@ -1,6 +1,6 @@
 #
 # Author:: John Keiser (<jkeiser@chef.io>)
-# Copyright:: Copyright 2013-2016, Chef Software Inc.
+# Copyright:: Copyright 2013-2019, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -49,64 +49,64 @@ describe "knife show", :workstation do
       end
 
       it "knife show /cookbooks/x/metadata.rb shows the remote version" do
-        knife("show /cookbooks/x/metadata.rb").should_succeed <<EOM
-/cookbooks/x/metadata.rb:
-name "x"; version "1.0.0"
-EOM
+        knife("show /cookbooks/x/metadata.rb").should_succeed <<~EOM
+          /cookbooks/x/metadata.rb:
+          name "x"; version "1.0.0"
+        EOM
       end
       it "knife show --local /cookbooks/x/metadata.rb shows the local version" do
-        knife("show --local /cookbooks/x/metadata.rb").should_succeed <<EOM
-/cookbooks/x/metadata.rb:
-name "x"; version "1.0.0"
-EOM
+        knife("show --local /cookbooks/x/metadata.rb").should_succeed <<~EOM
+          /cookbooks/x/metadata.rb:
+          name "x"; version "1.0.0"
+        EOM
       end
       it "knife show /data_bags/x/y.json shows the remote version" do
-        knife("show /data_bags/x/y.json").should_succeed <<EOM
-/data_bags/x/y.json:
-{
-  "id": "y"
-}
-EOM
+        knife("show /data_bags/x/y.json").should_succeed <<~EOM
+          /data_bags/x/y.json:
+          {
+            "id": "y"
+          }
+        EOM
       end
       it "knife show --local /data_bags/x/y.json shows the local version" do
-        knife("show --local /data_bags/x/y.json").should_succeed <<EOM
-/data_bags/x/y.json:
-{
-  "foo": "bar"
-}
-EOM
+        knife("show --local /data_bags/x/y.json").should_succeed <<~EOM
+          /data_bags/x/y.json:
+          {
+            "foo": "bar"
+          }
+        EOM
       end
-      it "knife show /environments/x.json shows the remote version", :skip => (RUBY_VERSION < "1.9") do
-        knife("show /environments/x.json").should_succeed <<EOM
-/environments/x.json:
-{
-  "name": "x"
-}
-EOM
+      it "knife show /environments/x.json shows the remote version" do
+        knife("show /environments/x.json").should_succeed <<~EOM
+          /environments/x.json:
+          {
+            "name": "x"
+          }
+        EOM
       end
       it "knife show --local /environments/x.json shows the local version" do
-        knife("show --local /environments/x.json").should_succeed <<EOM
-/environments/x.json:
-{
-  "foo": "bar"
-}
-EOM
+        knife("show --local /environments/x.json").should_succeed <<~EOM
+          /environments/x.json:
+          {
+            "foo": "bar"
+          }
+        EOM
       end
-      it "knife show /roles/x.json shows the remote version", :skip => (RUBY_VERSION < "1.9") do
-        knife("show /roles/x.json").should_succeed <<EOM
-/roles/x.json:
-{
-  "name": "x"
-}
-EOM
+      it "knife show /roles/x.json shows the remote version" do
+        knife("show /roles/x.json").should_succeed <<~EOM
+          /roles/x.json:
+          {
+            "name": "x"
+          }
+        EOM
       end
       it "knife show --local /roles/x.json shows the local version" do
-        knife("show --local /roles/x.json").should_succeed <<EOM
-/roles/x.json:
-{
-  "foo": "bar"
-}
-EOM
+        knife("show --local /roles/x.json").should_succeed <<~EOM
+          /roles/x.json:
+          {
+            "foo": "bar"
+          }
+        EOM
       end
       # show directory
       it "knife show /data_bags/x fails" do
@@ -135,33 +135,33 @@ EOM
         "name" => "x",
       }
     end
-    it "knife show shows the attributes in a predetermined order", :skip => (RUBY_VERSION < "1.9") do
-      knife("show /environments/x.json").should_succeed <<EOM
-/environments/x.json:
-{
-  "name": "x",
-  "description": "woo",
-  "cookbook_versions": {
-    "blah": "= 1.0.0"
-  },
-  "default_attributes": {
-    "foo": "bar"
-  },
-  "override_attributes": {
-    "x": "y"
-  }
-}
-EOM
+    it "knife show shows the attributes in a predetermined order" do
+      knife("show /environments/x.json").should_succeed <<~EOM
+        /environments/x.json:
+        {
+          "name": "x",
+          "description": "woo",
+          "cookbook_versions": {
+            "blah": "= 1.0.0"
+          },
+          "default_attributes": {
+            "foo": "bar"
+          },
+          "override_attributes": {
+            "x": "y"
+          }
+        }
+      EOM
     end
   end
 
   when_the_repository "has an environment with bad JSON" do
     before { file "environments/x.json", "{" }
     it "knife show succeeds" do
-      knife("show --local /environments/x.json").should_succeed <<EOM
-/environments/x.json:
-{
-EOM
+      knife("show --local /environments/x.json").should_succeed <<~EOM
+        /environments/x.json:
+        {
+      EOM
     end
   end
 end

@@ -31,7 +31,7 @@ describe Chef::Knife::Ssh do
     @server.stop
   end
 
-  let(:ssh_config) { Hash.new }
+  let(:ssh_config) { {} }
   before do
     allow(Net::SSH).to receive(:configuration_for).and_return(ssh_config)
   end
@@ -181,11 +181,11 @@ describe Chef::Knife::Ssh do
 
       it "uses the ssh_attribute" do
         @knife.run
-        expect(@knife.get_ssh_attribute({ "knife_config" => "ec2.public_hostname" })).to eq("ec2.public_hostname")
+        expect(@knife.get_ssh_attribute({ "target" => "ec2.public_hostname" })).to eq("ec2.public_hostname")
       end
     end
 
-    context "when knife[:ssh_attribute] is not provided]" do
+    context "when knife[:ssh_attribute] is not provided" do
       before do
         setup_knife(["*:*", "uptime"])
         Chef::Config[:knife][:ssh_attribute] = nil
@@ -199,22 +199,69 @@ describe Chef::Knife::Ssh do
 
     context "when -a ec2.public_public_hostname is provided" do
       before do
-        setup_knife(["-a ec2.public_hostname", "*:*", "uptime"])
+        setup_knife(["-a", "ec2.public_hostname", "*:*", "uptime"])
         Chef::Config[:knife][:ssh_attribute] = nil
       end
 
       it "should use the value on the command line" do
         @knife.run
-        expect(@knife.config[:attribute]).to eq("ec2.public_hostname")
+        expect(@knife.config[:ssh_attribute]).to eq("ec2.public_hostname")
       end
 
       it "should override what is set in knife.rb" do
         # This is the setting imported from knife.rb
         Chef::Config[:knife][:ssh_attribute] = "fqdn"
         # Then we run knife with the -a flag, which sets the above variable
-        setup_knife(["-a ec2.public_hostname", "*:*", "uptime"])
+        setup_knife(["-a", "ec2.public_hostname", "*:*", "uptime"])
         @knife.run
-        expect(@knife.config[:attribute]).to eq("ec2.public_hostname")
+        expect(@knife.config[:ssh_attribute]).to eq("ec2.public_hostname")
+      end
+    end
+  end
+
+  describe "prefix" do
+    context "when knife[:prefix_attribute] is set" do
+      before do
+        setup_knife(["*:*", "uptime"])
+        Chef::Config[:knife][:prefix_attribute] = "name"
+      end
+
+      it "uses the prefix_attribute" do
+        @knife.run
+        expect(@knife.get_prefix_attribute({ "prefix" => "name" })).to eq("name")
+      end
+    end
+
+    context "when knife[:prefix_attribute] is not provided" do
+      before do
+        setup_knife(["*:*", "uptime"])
+        Chef::Config[:knife][:prefix_attribute] = nil
+      end
+
+      it "falls back to nil" do
+        @knife.run
+        expect(@knife.get_prefix_attribute({})).to eq(nil)
+      end
+    end
+
+    context "when --prefix-attribute ec2.public_public_hostname is provided" do
+      before do
+        setup_knife(["--prefix-attribute", "ec2.public_hostname", "*:*", "uptime"])
+        Chef::Config[:knife][:prefix_attribute] = nil
+      end
+
+      it "should use the value on the command line" do
+        @knife.run
+        expect(@knife.config[:prefix_attribute]).to eq("ec2.public_hostname")
+      end
+
+      it "should override what is set in knife.rb" do
+        # This is the setting imported from knife.rb
+        Chef::Config[:knife][:prefix_attribute] = "fqdn"
+        # Then we run knife with the -b flag, which sets the above variable
+        setup_knife(["--prefix-attribute", "ec2.public_hostname", "*:*", "uptime"])
+        @knife.run
+        expect(@knife.config[:prefix_attribute]).to eq("ec2.public_hostname")
       end
     end
   end
@@ -254,7 +301,7 @@ describe Chef::Knife::Ssh do
       end
 
       it "uses the ssh_gateway_identity file" do
-        expect(@knife.session).to receive(:via).with("ec2.public_hostname", "user", { :keys => File.expand_path("#{ENV['HOME']}/.ssh/aws-gateway.rsa").squeeze("/"), :keys_only => true })
+        expect(@knife.session).to receive(:via).with("ec2.public_hostname", "user", { keys: File.expand_path("#{ENV["HOME"]}/.ssh/aws-gateway.rsa").squeeze("/"), keys_only: true })
         @knife.run
         expect(@knife.config[:ssh_gateway_identity]).to eq("~/.ssh/aws-gateway.rsa")
       end
@@ -268,7 +315,7 @@ describe Chef::Knife::Ssh do
       end
 
       it "uses the ssh_gateway_identity file" do
-        expect(@knife.session).to receive(:via).with("ec2.public_hostname", "user", { :keys => File.expand_path("#{ENV['HOME']}/.ssh/aws-gateway.rsa").squeeze("/"), :keys_only => true })
+        expect(@knife.session).to receive(:via).with("ec2.public_hostname", "user", { keys: File.expand_path("#{ENV["HOME"]}/.ssh/aws-gateway.rsa").squeeze("/"), keys_only: true })
         @knife.run
         expect(@knife.config[:ssh_gateway_identity]).to eq("~/.ssh/aws-gateway.rsa")
       end
@@ -304,8 +351,8 @@ describe Chef::Knife::Ssh do
     Chef::Config[:client_key] = nil
     Chef::Config[:chef_server_url] = "http://localhost:9000"
 
-    @api.post("/search/node?q=*:*&start=0", 200) do
-      %({"total":1, "start":0, "rows":[{"data": {"fqdn":"the.fqdn", "config": "the_public_hostname", "knife_config": "the_public_hostname" }}]})
+    @api.post("/search/node?q=*:*&start=0&rows=1000", 200) do
+      %({"total":1, "start":0, "rows":[{"data": {"fqdn":"the.fqdn", "target": "the_public_hostname"}}]})
     end
   end
 

@@ -17,8 +17,8 @@
 # limitations under the License.
 #
 
-require "chef/provider/service/init"
-require "chef/util/path_helper"
+require_relative "init"
+require_relative "../../util/path_helper"
 
 class Chef::Provider::Service::Gentoo < Chef::Provider::Service::Init
 
@@ -36,11 +36,11 @@ class Chef::Provider::Service::Gentoo < Chef::Provider::Service::Init
         @found_script = true
         exists = ::File.exists? file
         readable = ::File.readable? file
-        Chef::Log.debug "#{@new_resource} exists: #{exists}, readable: #{readable}"
+        logger.trace "#{@new_resource} exists: #{exists}, readable: #{readable}"
         exists && readable
       end
     )
-    Chef::Log.debug "#{@new_resource} enabled: #{@current_resource.enabled}"
+    logger.trace "#{@new_resource} enabled: #{@current_resource.enabled}"
 
     @current_resource
   end

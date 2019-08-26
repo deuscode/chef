@@ -16,7 +16,7 @@ describe "Accumulators" do
   # machine that has omnibus chef installed. In that case we need to ensure
   # we're running `chef-client` from the source tree and not the external one.
   # cf. CHEF-4914
-  let(:chef_client) { "ruby '#{chef_dir}/chef-client' --minimal-ohai" }
+  let(:chef_client) { "bundle exec chef-client --minimal-ohai" }
 
   let(:aliases_temppath) do
     t = Tempfile.new("chef_accumulator_test")
@@ -115,11 +115,11 @@ describe "Accumulators" do
     it "should complete with success" do
       file "config/client.rb", <<-EOM
         local_mode true
-        cookbook_path "#{path_to('cookbooks')}"
+        cookbook_path "#{path_to("cookbooks")}"
         log_level :warn
       EOM
 
-      result = shell_out("#{chef_client} -c \"#{path_to('config/client.rb')}\" --no-color -F doc -o 'x::default'", :cwd => chef_dir)
+      result = shell_out("#{chef_client} -c \"#{path_to("config/client.rb")}\" --no-color -F doc -o 'x::default'", cwd: chef_dir)
       result.error!
       # runs only a single template resource (in the outer run context, as a delayed resource)
       expect(result.stdout.scan(/template\S+ action create/).size).to eql(1)
@@ -217,11 +217,11 @@ describe "Accumulators" do
     it "should complete with success" do
       file "config/client.rb", <<-EOM
         local_mode true
-        cookbook_path "#{path_to('cookbooks')}"
+        cookbook_path "#{path_to("cookbooks")}"
         log_level :warn
       EOM
 
-      result = shell_out("#{chef_client} -c \"#{path_to('config/client.rb')}\" --no-color -F doc -o 'x::default'", :cwd => chef_dir)
+      result = shell_out("#{chef_client} -c \"#{path_to("config/client.rb")}\" --no-color -F doc -o 'x::default'", cwd: chef_dir)
       result.error!
       # runs only a single template resource (in the outer run context, as a delayed resource)
       expect(result.stdout.scan(/template\S+ action create/).size).to eql(1)

@@ -29,56 +29,56 @@ describe Chef::Provider::Launchd do
     let(:label) { "call.mom.weekly" }
     let(:new_resource) { Chef::Resource::Launchd.new(label) }
     let!(:current_resource) { Chef::Resource::Launchd.new(label) }
-    let(:test_plist) { String.new <<-XML }
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-\t<key>Label</key>
-\t<string>call.mom.weekly</string>
-\t<key>Program</key>
-\t<string>/Library/scripts/call_mom.sh</string>
-\t<key>StartCalendarInterval</key>
-\t<dict>
-\t\t<key>Hour</key>
-\t\t<integer>10</integer>
-\t\t<key>Weekday</key>
-\t\t<integer>7</integer>
-\t</dict>
-\t<key>TimeOut</key>
-\t<integer>300</integer>
-</dict>
-</plist>
-XML
-    let(:test_plist_multiple_intervals) { String.new <<-XML }
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-\t<key>Label</key>
-\t<string>call.mom.weekly</string>
-\t<key>Program</key>
-\t<string>/Library/scripts/call_mom.sh</string>
-\t<key>StartCalendarInterval</key>
-\t<array>
-\t\t<dict>
-\t\t\t<key>Hour</key>
-\t\t\t<integer>11</integer>
-\t\t\t<key>Weekday</key>
-\t\t\t<integer>1</integer>
-\t\t</dict>
-\t\t<dict>
-\t\t\t<key>Hour</key>
-\t\t\t<integer>12</integer>
-\t\t\t<key>Weekday</key>
-\t\t\t<integer>2</integer>
-\t\t</dict>
-\t</array>
-\t<key>TimeOut</key>
-\t<integer>300</integer>
-</dict>
-</plist>
-XML
+    let(:test_plist) { String.new <<~XML }
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+      <plist version="1.0">
+      <dict>
+      \t<key>Label</key>
+      \t<string>call.mom.weekly</string>
+      \t<key>Program</key>
+      \t<string>/Library/scripts/call_mom.sh</string>
+      \t<key>StartCalendarInterval</key>
+      \t<dict>
+      \t\t<key>Hour</key>
+      \t\t<integer>10</integer>
+      \t\t<key>Weekday</key>
+      \t\t<integer>7</integer>
+      \t</dict>
+      \t<key>TimeOut</key>
+      \t<integer>300</integer>
+      </dict>
+      </plist>
+    XML
+    let(:test_plist_multiple_intervals) { String.new <<~XML }
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+      <plist version="1.0">
+      <dict>
+      \t<key>Label</key>
+      \t<string>call.mom.weekly</string>
+      \t<key>Program</key>
+      \t<string>/Library/scripts/call_mom.sh</string>
+      \t<key>StartCalendarInterval</key>
+      \t<array>
+      \t\t<dict>
+      \t\t\t<key>Hour</key>
+      \t\t\t<integer>11</integer>
+      \t\t\t<key>Weekday</key>
+      \t\t\t<integer>1</integer>
+      \t\t</dict>
+      \t\t<dict>
+      \t\t\t<key>Hour</key>
+      \t\t\t<integer>12</integer>
+      \t\t\t<key>Weekday</key>
+      \t\t\t<integer>2</integer>
+      \t\t</dict>
+      \t</array>
+      \t<key>TimeOut</key>
+      \t<integer>300</integer>
+      </dict>
+      </plist>
+    XML
 
     let(:test_hash) do
       {
@@ -89,7 +89,8 @@ XML
         "Weekday" => 7,
       },
       "TimeOut" => 300,
-    } end
+    }
+    end
 
     before(:each) do
       provider.load_current_resource
@@ -112,14 +113,14 @@ XML
       describe "agent" do
         it "path should be /Library/LaunchAgents/call.mom.weekly.plist" do
           new_resource.type "agent"
-          expect(provider.gen_path_from_type).
-            to eq("/Library/LaunchAgents/call.mom.weekly.plist")
+          expect(provider.gen_path_from_type)
+            .to eq("/Library/LaunchAgents/call.mom.weekly.plist")
         end
       end
       describe "daemon" do
         it "path should be /Library/LaunchDaemons/call.mom.weekly.plist" do
-          expect(provider.gen_path_from_type).
-            to eq("/Library/LaunchDaemons/call.mom.weekly.plist")
+          expect(provider.gen_path_from_type)
+            .to eq("/Library/LaunchDaemons/call.mom.weekly.plist")
         end
       end
     end
@@ -139,7 +140,7 @@ XML
         it "should allow array of Hashes" do
           allowed = (1..2).collect do |num|
             {
-              "Hour"    => 10 + num,
+              "Hour" => 10 + num,
               "Weekday" => num,
             }
           end
@@ -152,11 +153,11 @@ XML
 
         it "should allow all StartCalendarInterval keys" do
           allowed = {
-            "Minute"  => 1,
-            "Hour"    => 1,
-            "Day"     => 1,
+            "Minute" => 1,
+            "Hour" => 1,
+            "Day" => 1,
             "Weekday" => 1,
-            "Month"   => 1,
+            "Month" => 1,
           }
           new_resource.program "/Library/scripts/call_mom.sh"
           new_resource.time_out 300
@@ -197,9 +198,11 @@ XML
       describe "and the file has been updated" do
         before(:each) do
           allow(provider).to receive(
-            :manage_plist).with(:create).and_return(true)
+            :manage_plist
+          ).with(:create).and_return(true)
           allow(provider).to receive(
-            :manage_service).with(:restart).and_return(true)
+            :manage_service
+          ).with(:restart).and_return(true)
         end
 
         it "should call manage_service with a :restart action" do
@@ -215,9 +218,11 @@ XML
       describe "and the file has not been updated" do
         before(:each) do
           allow(provider).to receive(
-            :manage_plist).with(:create).and_return(nil)
+            :manage_plist
+          ).with(:create).and_return(nil)
           allow(provider).to receive(
-            :manage_service).with(:enable).and_return(true)
+            :manage_service
+          ).with(:enable).and_return(true)
         end
 
         it "should call manage_service with a :enable action" do
@@ -236,9 +241,11 @@ XML
         before(:each) do
           allow(File).to receive(:exists?).and_return(true)
           allow(provider).to receive(
-            :manage_service).with(:disable).and_return(true)
+            :manage_service
+          ).with(:disable).and_return(true)
           allow(provider).to receive(
-            :manage_plist).with(:delete).and_return(true)
+            :manage_plist
+          ).with(:delete).and_return(true)
         end
 
         it "should call manage_service with a :disable action" do
@@ -255,7 +262,8 @@ XML
         before(:each) do
           allow(File).to receive(:exists?).and_return(false)
           allow(provider).to receive(
-            :manage_plist).with(:delete).and_return(true)
+            :manage_plist
+          ).with(:delete).and_return(true)
         end
 
         it "works with action :delete" do

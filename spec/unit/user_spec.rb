@@ -17,7 +17,7 @@
 #
 
 # DEPRECATION NOTE
-# This code only remains to support users still	operating with
+# This code only remains to support users still  operating with
 # Open Source Chef Server 11 and should be removed once support
 # for OSC 11 ends. New development should occur in user_spec.rb.
 
@@ -65,7 +65,7 @@ describe Chef::User do
     end
 
     it "should throw an ArgumentError if you feed it anything but a string" do
-      expect { @user.name Hash.new }.to raise_error(ArgumentError)
+      expect { @user.name({}) }.to raise_error(ArgumentError)
     end
   end
 
@@ -84,7 +84,7 @@ describe Chef::User do
     end
 
     it "should throw an ArgumentError if you feed it anything but true or false" do
-      expect { @user.name Hash.new }.to raise_error(ArgumentError)
+      expect { @user.name({}) }.to raise_error(ArgumentError)
     end
   end
 
@@ -99,7 +99,7 @@ describe Chef::User do
     end
 
     it "should throw an ArgumentError if you feed it something lame" do
-      expect { @user.public_key Hash.new }.to raise_error(ArgumentError)
+      expect { @user.public_key({}) }.to raise_error(ArgumentError)
     end
   end
 
@@ -114,7 +114,7 @@ describe Chef::User do
     end
 
     it "should throw an ArgumentError if you feed it something lame" do
-      expect { @user.private_key Hash.new }.to raise_error(ArgumentError)
+      expect { @user.private_key({}) }.to raise_error(ArgumentError)
     end
   end
 
@@ -243,7 +243,7 @@ describe Chef::User do
     describe "create" do
       it "creates a new user via the API" do
         @user.password "password"
-        expect(@http_client).to receive(:post).with("users", { :name => "foobar", :admin => false, :password => "password" }).and_return({})
+        expect(@http_client).to receive(:post).with("users", { name: "foobar", admin: false, password: "password" }).and_return({})
         @user.create
       end
     end
@@ -260,7 +260,7 @@ describe Chef::User do
 
     describe "update" do
       it "updates an existing user on via the API" do
-        expect(@http_client).to receive(:put).with("users/foobar", { :name => "foobar", :admin => false }).and_return({})
+        expect(@http_client).to receive(:put).with("users/foobar", { name: "foobar", admin: false }).and_return({})
         @user.update
       end
     end

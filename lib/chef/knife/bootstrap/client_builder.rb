@@ -16,12 +16,11 @@
 # limitations under the License.
 #
 
-require "chef/node"
-require "chef/server_api"
-require "chef/api_client/registration"
-require "chef/api_client"
-require "chef/knife/bootstrap"
-require "tmpdir"
+require_relative "../../node"
+require_relative "../../server_api"
+require_relative "../../api_client/registration"
+require_relative "../../api_client"
+require "tmpdir" unless defined?(Dir.mktmpdir)
 
 class Chef
   class Knife
@@ -187,14 +186,15 @@ class Chef
         def resource_exists?(relative_path)
           rest.get(relative_path)
           true
-        rescue Net::HTTPServerException => e
+        rescue Net::HTTPClientException => e
           raise unless e.response.code == "404"
+
           false
         end
 
         # @return [Chef::ServerAPI] REST client using the client credentials
         def client_rest
-          @client_rest ||= Chef::ServerAPI.new(chef_server_url, :client_name => node_name, :signing_key_filename => client_path)
+          @client_rest ||= Chef::ServerAPI.new(chef_server_url, client_name: node_name, signing_key_filename: client_path)
         end
 
         # @return [Chef::ServerAPI] REST client using the cli user's knife credentials

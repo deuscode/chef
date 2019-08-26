@@ -16,13 +16,12 @@
 # limitations under the License.
 #
 
-require "chef/provider"
-require "chef/resource/launchd"
-require "chef/resource/file"
-require "chef/resource/cookbook_file"
-require "chef/resource/macosx_service"
+require_relative "../provider"
+require_relative "../resource/file"
+require_relative "../resource/cookbook_file"
+require_relative "../resource/macosx_service"
 require "plist"
-require "forwardable"
+require "forwardable" unless defined?(Forwardable)
 
 class Chef
   class Provider
@@ -30,18 +29,18 @@ class Chef
       extend Forwardable
       provides :launchd, os: "darwin"
 
-      def_delegators :new_resource, *[
-        :backup,
-        :cookbook,
-        :group,
-        :label,
-        :mode,
-        :owner,
-        :path,
-        :source,
-        :session_type,
-        :type,
-      ]
+      def_delegators :new_resource, *%i{
+        backup
+        cookbook
+        group
+        label
+        mode
+        owner
+        path
+        source
+        session_type
+        type
+      }
 
       def load_current_resource
         current_resource = Chef::Resource::Launchd.new(new_resource.name)
@@ -90,6 +89,8 @@ class Chef
       end
 
       def manage_plist(action)
+        return unless manage_agent?(action)
+
         if source
           res = cookbook_file_resource
         else
@@ -101,9 +102,29 @@ class Chef
       end
 
       def manage_service(action)
+        return unless manage_agent?(action)
+
         res = service_resource
         res.run_action(action)
         new_resource.updated_by_last_action(true) if res.updated?
+      end
+
+      def manage_agent?(action)
+        # Gets UID of console_user and converts to string.
+        console_user = Etc.getpwuid(::File.stat("/dev/console").uid).name
+        root = console_user == "root"
+        agent = type == "agent"
+        invalid_action = %i{delete disable enable restart}.include?(action)
+        lltstype = ""
+        if new_resource.limit_load_to_session_type
+          lltstype = new_resource.limit_load_to_session_type
+        end
+        invalid_type = lltstype != "LoginWindow"
+        if root && agent && invalid_action && invalid_type
+          logger.trace("#{label}: Aqua LaunchAgents shouldn't be loaded as root")
+          return false
+        end
+        true
       end
 
       def service_resource
@@ -160,6 +181,7 @@ class Chef
 
       def gen_hash
         return nil unless new_resource.program || new_resource.program_arguments
+
         {
           "label" => "Label",
           "program" => "Program",
@@ -176,6 +198,7 @@ class Chef
           "inetd_compatibility" => "inetdCompatibility",
           "init_groups" => "InitGroups",
           "keep_alive" => "KeepAlive",
+          "launch_events" => "LaunchEvents",
           "launch_only_once" => "LaunchOnlyOnce",
           "limit_load_from_hosts" => "LimitLoadFromHosts",
           "limit_load_to_hosts" => "LimitLoadToHosts",

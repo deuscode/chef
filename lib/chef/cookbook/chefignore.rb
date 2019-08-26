@@ -1,4 +1,3 @@
-#--
 # Author:: Daniel DeLeo (<dan@chef.io>)
 # Copyright:: Copyright 2011-2016, Chef Software Inc.
 # License:: Apache License, Version 2.0
@@ -20,7 +19,7 @@ class Chef
   class Cookbook
     class Chefignore
 
-      COMMENTS_AND_WHITESPACE = /^\s*(?:#.*)?$/
+      COMMENTS_AND_WHITESPACE = /^\s*(?:#.*)?$/.freeze
 
       attr_reader :ignores
 
@@ -33,12 +32,16 @@ class Chef
         @ignores = parse_ignore_file
       end
 
+      # @param [Array] file_list the list of cookbook files
+      # @return [Array] list of cookbook files with chefignore files removed
       def remove_ignores_from(file_list)
         Array(file_list).inject([]) do |unignored, file|
           ignored?(file) ? unignored : unignored << file
         end
       end
 
+      # @param [String] file_name the file name to check ignored status for
+      # @return [Boolean] is the file ignored or not
       def ignored?(file_name)
         @ignores.any? { |glob| File.fnmatch?(glob, file_name) }
       end
@@ -52,7 +55,7 @@ class Chef
             ignore_globs << line.strip unless line =~ COMMENTS_AND_WHITESPACE
           end
         else
-          Chef::Log.debug("No chefignore file found at #{@ignore_file} no files will be ignored")
+          Chef::Log.trace("No chefignore file found at #{@ignore_file} no files will be ignored")
         end
         ignore_globs
       end

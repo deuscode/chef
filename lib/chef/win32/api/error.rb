@@ -16,7 +16,7 @@
 # limitations under the License.
 #
 
-require "chef/win32/api"
+require_relative "../api"
 
 class Chef
   module ReservedNames::Win32
@@ -194,12 +194,12 @@ class Chef
         ERROR_INVALID_EXE_SIGNATURE     = 191
         ERROR_EXE_MARKED_INVALID        = 192
         ERROR_BAD_EXE_FORMAT            = 193
-        ERROR_ITERATED_DATA_EXCEEDS_64k = 194 # rubocop:disable Style/ConstantName
+        ERROR_ITERATED_DATA_EXCEEDS_64k = 194 # rubocop:disable Naming/ConstantName
         ERROR_INVALID_MINALLOCSIZE      = 195
         ERROR_DYNLINK_FROM_INVALID_RING = 196
         ERROR_IOPL_NOT_ENABLED          = 197
         ERROR_INVALID_SEGDPL            = 198
-        ERROR_AUTODATASEG_EXCEEDS_64k   = 199 # rubocop:disable Style/ConstantName
+        ERROR_AUTODATASEG_EXCEEDS_64k   = 199 # rubocop:disable Naming/ConstantName
         ERROR_RING2SEG_MUST_BE_MOVABLE  = 200
         ERROR_RELOC_CHAIN_XEEDS_SEGLIM  = 201
         ERROR_INFLOOP_IN_RELOC_CHAIN    = 202
@@ -211,9 +211,9 @@ class Chef
         ERROR_META_EXPANSION_TOO_LONG   = 208 # if "*a" > 8.3
         ERROR_INVALID_SIGNAL_NUMBER     = 209
         ERROR_THREAD_1_INACTIVE         = 210
-        ERROR_INFO_NOT_AVAIL            = 211 #@@ PTM 5550
+        ERROR_INFO_NOT_AVAIL            = 211 # @@ PTM 5550
         ERROR_LOCKED                    = 212
-        ERROR_BAD_DYNALINK              = 213 #@@ PTM 5760
+        ERROR_BAD_DYNALINK              = 213 # @@ PTM 5760
         ERROR_TOO_MANY_MODULES          = 214
         ERROR_NESTING_NOT_ALLOWED       = 215
         ERROR_EXE_MACHINE_TYPE_MISMATCH = 216
@@ -905,8 +905,8 @@ DWORD WINAPI FormatMessage(
   __in_opt  va_list *Arguments
 );
 =end
-        safe_attach_function :FormatMessageA, [:DWORD, :HANDLE, :DWORD, :DWORD, :LPTSTR, :DWORD, :varargs], :DWORD
-        safe_attach_function :FormatMessageW, [:DWORD, :HANDLE, :DWORD, :DWORD, :LPWSTR, :DWORD, :varargs], :DWORD
+        safe_attach_function :FormatMessageA, %i{DWORD HANDLE DWORD DWORD LPTSTR DWORD varargs}, :DWORD
+        safe_attach_function :FormatMessageW, %i{DWORD HANDLE DWORD DWORD LPWSTR DWORD varargs}, :DWORD
 
 =begin
 DWORD WINAPI GetLastError(void);
@@ -918,7 +918,7 @@ void WINAPI SetLastError(
 );
 =end
         safe_attach_function :SetLastError, [:DWORD], :void
-        safe_attach_function :SetLastErrorEx, [:DWORD, :DWORD], :void
+        safe_attach_function :SetLastErrorEx, %i{DWORD DWORD}, :void
 =begin
 UINT WINAPI GetErrorMode(void);s
 =end
@@ -938,7 +938,7 @@ HMODULE WINAPI LoadLibraryEx(
   _In_       DWORD   dwFlags
 );
 =end
-        safe_attach_function :LoadLibraryExW, [:LPCTSTR, :HANDLE, :DWORD], :HANDLE
+        safe_attach_function :LoadLibraryExW, %i{LPCTSTR HANDLE DWORD}, :HANDLE
 
 =begin
 https://msdn.microsoft.com/en-us/library/windows/desktop/ms683152(v=vs.85).aspx

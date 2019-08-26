@@ -1,6 +1,6 @@
 #
 # Author:: Adam Jacob (<adam@chef.io>)
-# Copyright:: Copyright 2008-2017, Chef Software Inc.
+# Copyright:: Copyright 2008-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,18 +16,17 @@
 # limitations under the License.
 #
 
-require "chef/config"
-require "chef/exceptions"
-require "chef/server_api"
+require_relative "../config"
+require_relative "../exceptions"
+require_relative "../server_api"
 
-require "uri"
-require "addressable/uri"
+require "uri" unless defined?(URI)
+require "addressable/uri" unless defined?(Addressable::URI)
 
 class Chef
   class Search
     class Query
 
-      attr_accessor :rest
       attr_reader :config
 
       def initialize(url = nil, config: Chef::Config)
@@ -71,6 +70,11 @@ class Chef
           args_h = args_h.reject { |k, v| k == :fuzz }
         end
 
+        # Set default rows parameter to 1000. This is the default in
+        # Chef Server, but we set it explicitly here so that we can
+        # confidently advance our start parameter.
+        args_h[:rows] ||= 1000
+
         response = call_rest_service(type, query: query, **args_h)
 
         if block
@@ -87,7 +91,7 @@ class Chef
           # args_h[:rows] to avoid asking the search backend for
           # overlapping pages (which could result in duplicates).
           #
-          next_start = response["start"] + (args_h[:rows] || response["rows"].length)
+          next_start = response["start"] + args_h[:rows]
           unless next_start >= response["total"]
             args_h[:start] = next_start
             search(type, query, args_h, &block)
@@ -109,7 +113,7 @@ class Chef
       end
 
       def validate_type(t)
-        unless t.kind_of?(String) || t.kind_of?(Symbol)
+        unless t.is_a?(String) || t.is_a?(Symbol)
           msg = "Invalid search object type #{t.inspect} (#{t.class}), must be a String or Symbol." +
             "Usage: search(:node, QUERY[, OPTIONAL_ARGS])" +
             "        `knife search environment QUERY (options)`"
@@ -118,10 +122,10 @@ class Chef
       end
 
       def hashify_args(*args)
-        return Hash.new if args.empty?
+        return {} if args.empty?
         return args.first if args.first.is_a?(Hash)
 
-        args_h = Hash.new
+        args_h = {}
         # If we have 4 arguments, the first is the now-removed sort option, so
         # just ignore it.
         args.pop(0) if args.length == 4

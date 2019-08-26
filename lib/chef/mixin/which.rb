@@ -1,6 +1,6 @@
 #--
 # Author:: Lamont Granquist <lamont@chef.io>
-# Copyright:: Copyright 2010-2017, Chef Software Inc.
+# Copyright:: Copyright 2010-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +18,8 @@
 class Chef
   module Mixin
     module Which
+      require_relative "../chef_class"
+
       def which(*cmds, extra_path: nil, &block)
         where(*cmds, extra_path: extra_path, &block).first || false
       end
@@ -38,11 +40,23 @@ class Chef
 
       # for test stubbing
       def env_path
-        ENV["PATH"]
+        if Chef::Config.target_mode?
+          Chef.run_context.transport_connection.run_command("echo $PATH").stdout
+        else
+          ENV["PATH"]
+        end
       end
 
       def valid_executable?(filename, &block)
-        return false unless File.executable?(filename) && !File.directory?(filename)
+        is_executable =
+          if Chef::Config.target_mode?
+            connection = Chef.run_context.transport_connection
+            connection.file(filename).stat[:mode] & 1 && !connection.file(filename).directory?
+          else
+            File.executable?(filename) && !File.directory?(filename)
+          end
+        return false unless is_executable
+
         block ? yield(filename) : true
       end
     end

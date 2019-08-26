@@ -24,12 +24,11 @@ describe Chef::Application::Knife do
   before(:all) do
     class NoopKnifeCommand < Chef::Knife
       option :opt_with_default,
-        :short => "-D VALUE",
-        :long => "-optwithdefault VALUE",
-        :default => "default-value"
+        short: "-D VALUE",
+        long: "-optwithdefault VALUE",
+        default: "default-value"
 
-      def run
-      end
+      def run; end
     end
   end
 
@@ -75,11 +74,7 @@ describe Chef::Application::Knife do
       expect(@knife).to receive(:exit).with(0)
       @knife.run
     end
-    if windows?
-      expect(Chef::Config[:color]).to be_truthy
-    else
-      expect(Chef::Config[:color]).to be_truthy
-    end
+    expect(Chef::Config[:color]).to be_truthy
   end
 
   context "when given fips flags" do

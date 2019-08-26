@@ -1,6 +1,6 @@
 #
 # Author:: Tim Hinderliter (<tim@chef.io>)
-# Copyright:: Copyright 2010-2016, Chef Software Inc.
+# Copyright:: Copyright 2010-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,8 +17,8 @@
 
 # Wrapper class for interacting with JSON.
 
-require "ffi_yajl"
-require "chef/exceptions"
+require "ffi_yajl" unless defined?(FFI_Yajl)
+require_relative "exceptions"
 # We're requiring this to prevent breaking consumers using Hash.to_json
 require "json"
 
@@ -42,7 +42,7 @@ class Chef
         # JSON gem requires top level object to be a Hash or Array (otherwise
         # you get the "must contain two octets" error). Yajl doesn't impose the
         # same limitation. For compatibility, we re-impose this condition.
-        unless obj.kind_of?(Hash) || obj.kind_of?(Array)
+        unless obj.is_a?(Hash) || obj.is_a?(Array)
           raise Chef::Exceptions::JSON::ParseError, "Top level JSON object must be a Hash or Array. (actual: #{obj.class})"
         end
 
@@ -59,7 +59,7 @@ class Chef
         opts ||= {}
         options_map = {}
         options_map[:pretty] = true
-        options_map[:indent] = opts[:indent] if opts.has_key?(:indent)
+        options_map[:indent] = opts[:indent] if opts.key?(:indent)
         to_json(obj, options_map).chomp
       end
 

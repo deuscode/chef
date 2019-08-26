@@ -2,7 +2,7 @@
 # Author:: Adam Jacob (<adam@chef.io>)
 # Author:: Christopher Walters (<cw@chef.io>)
 # Author:: Daniel DeLeo (<dan@chef.io>)
-# Copyright:: Copyright 2008-2016, Chef Software, Inc.
+# Copyright:: Copyright 2008-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,14 +18,14 @@
 # limitations under the License.
 #
 
-require "chef/resource"
-require "chef/resource_resolver"
-require "chef/node"
-require "chef/log"
-require "chef/exceptions"
-require "chef/mixin/convert_to_class_name"
-require "chef/mixin/from_file"
-require "chef/mixin/params_validate" # for DelayedEvaluator
+require_relative "../resource"
+require_relative "../resource_resolver"
+require_relative "../node"
+require_relative "../log"
+require_relative "../exceptions"
+require_relative "../mixin/convert_to_class_name"
+require_relative "../mixin/from_file"
+require_relative "../mixin/params_validate" # for DelayedEvaluator
 
 class Chef
   class Resource
@@ -41,19 +41,15 @@ class Chef
         include Chef::Mixin::ConvertToClassName
         include Chef::Mixin::FromFile
 
-        attr_accessor :loaded_lwrps
-
         def build_from_file(cookbook_name, filename, run_context)
           if LWRPBase.loaded_lwrps[filename]
-            Chef::Log.debug("Custom resource #{filename} from cookbook #{cookbook_name} has already been loaded!  Skipping the reload.")
+            Chef::Log.trace("Custom resource #{filename} from cookbook #{cookbook_name} has already been loaded!  Skipping the reload.")
             return loaded_lwrps[filename]
           end
 
           resource_name = filename_to_qualified_string(cookbook_name, filename)
 
-          # We load the class first to give it a chance to set its own name
           resource_class = Class.new(self)
-          resource_class.resource_name resource_name.to_sym
           resource_class.run_context = run_context
           resource_class.class_from_file(filename)
 
@@ -65,9 +61,13 @@ class Chef
             define_singleton_method(:inspect) { to_s }
           end
 
-          Chef::Log.debug("Loaded contents of #{filename} into resource #{resource_name} (#{resource_class})")
+          Chef::Log.trace("Loaded contents of #{filename} into resource #{resource_name} (#{resource_class})")
 
           LWRPBase.loaded_lwrps[filename] = true
+
+          # wire up the default resource name after the class is parsed only if we haven't declared one.
+          # (this ordering is important for MapCollision deprecation warnings)
+          resource_class.resource_name resource_name.to_sym if resource_class.resource_name.nil?
 
           resource_class
         end
@@ -102,6 +102,7 @@ class Chef
 
         protected
 
+        attr_writer :loaded_lwrps
         def loaded_lwrps
           @loaded_lwrps ||= {}
         end
@@ -114,6 +115,7 @@ class Chef
         # +default_action+ and other DSL-y methods when extending LWRP::Base.
         def from_superclass(m, default = nil)
           return default if superclass == Chef::Resource::LWRPBase
+
           superclass.respond_to?(m) ? superclass.send(m) : default
         end
       end

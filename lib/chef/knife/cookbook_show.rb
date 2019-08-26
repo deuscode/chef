@@ -16,39 +16,39 @@
 # limitations under the License.
 #
 
-require "chef/knife"
+require_relative "../knife"
 
 class Chef
   class Knife
     class CookbookShow < Knife
 
       deps do
-        require "chef/json_compat"
-        require "uri"
-        require "chef/cookbook_version"
+        require_relative "../json_compat"
+        require "uri" unless defined?(URI)
+        require_relative "../cookbook_version"
       end
 
       banner "knife cookbook show COOKBOOK [VERSION] [PART] [FILENAME] (options)"
 
       option :fqdn,
-       :short => "-f FQDN",
-       :long => "--fqdn FQDN",
-       :description => "The FQDN of the host to see the file for"
+        short: "-f FQDN",
+        long: "--fqdn FQDN",
+        description: "The FQDN of the host to see the file for."
 
       option :platform,
-       :short => "-p PLATFORM",
-       :long => "--platform PLATFORM",
-       :description => "The platform to see the file for"
+        short: "-p PLATFORM",
+        long: "--platform PLATFORM",
+        description: "The platform to see the file for."
 
       option :platform_version,
-       :short => "-V VERSION",
-       :long => "--platform-version VERSION",
-       :description => "The platform version to see the file for"
+        short: "-V VERSION",
+        long: "--platform-version VERSION",
+        description: "The platform version to see the file for."
 
       option :with_uri,
-        :short => "-w",
-        :long => "--with-uri",
-        :description => "Show corresponding URIs"
+        short: "-w",
+        long: "--with-uri",
+        description: "Show corresponding URIs."
 
       def run
         cookbook_name, cookbook_version, segment, filename = @name_args
@@ -57,14 +57,14 @@ class Chef
 
         case @name_args.length
         when 4 # We are showing a specific file
-          node = Hash.new
-          node[:fqdn] = config[:fqdn] if config.has_key?(:fqdn)
-          node[:platform] = config[:platform] if config.has_key?(:platform)
-          node[:platform_version] = config[:platform_version] if config.has_key?(:platform_version)
+          node = {}
+          node[:fqdn] = config[:fqdn] if config.key?(:fqdn)
+          node[:platform] = config[:platform] if config.key?(:platform)
+          node[:platform_version] = config[:platform_version] if config.key?(:platform_version)
 
           class << node
             def attribute?(name) # rubocop:disable Lint/NestedMethodDefinition
-              has_key?(name)
+              key?(name)
             end
           end
 

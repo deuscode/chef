@@ -16,7 +16,7 @@
 # limitations under the License.
 #
 
-require "chef/http/json_output"
+require_relative "json_output"
 
 class Chef
   class HTTP
@@ -26,7 +26,7 @@ class Chef
     # a `json_class` key.
     class JSONToModelOutput < JSONOutput
       def initialize(opts = {})
-        opts[:inflate_json_class] = true if !opts.has_key?(:inflate_json_class)
+        opts[:inflate_json_class] = true unless opts.key?(:inflate_json_class)
         super
       end
     end

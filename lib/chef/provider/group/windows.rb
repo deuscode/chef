@@ -16,9 +16,9 @@
 # limitations under the License.
 #
 
-require "chef/provider/user"
+require_relative "../user"
 if RUBY_PLATFORM =~ /mswin|mingw32|windows/
-  require "chef/util/windows/net_group"
+  require_relative "../../util/windows/net_group"
 end
 
 class Chef
@@ -42,7 +42,7 @@ class Chef
             members = @net_group.local_get_members
           rescue
             @group_exists = false
-            Chef::Log.debug("#{new_resource} group does not exist")
+            logger.trace("#{new_resource} group does not exist")
           end
 
           if members
@@ -77,6 +77,7 @@ class Chef
           else
             @net_group.local_set_members(new_resource.members)
           end
+          @net_group.local_group_set_info(new_resource.comment) if new_resource.comment
         end
 
         def has_current_group_member?(member)
@@ -89,7 +90,7 @@ class Chef
         end
 
         def locally_qualified_name(account_name)
-          account_name.include?("\\") ? account_name : "#{ENV['COMPUTERNAME']}\\#{account_name}"
+          account_name.include?("\\") ? account_name : "#{ENV["COMPUTERNAME"]}\\#{account_name}"
         end
 
         def validate_member!(member)
@@ -99,7 +100,7 @@ class Chef
         def lookup_account_name(account_name)
           Chef::ReservedNames::Win32::Security.lookup_account_name(locally_qualified_name(account_name))[1].to_s
         rescue Chef::Exceptions::Win32APIError
-          Chef::Log.warn("SID for '#{locally_qualified_name(account_name)}' could not be found")
+          logger.warn("SID for '#{locally_qualified_name(account_name)}' could not be found")
           ""
         end
 

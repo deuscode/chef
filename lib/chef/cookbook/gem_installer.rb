@@ -1,5 +1,4 @@
-#--
-# Copyright:: Copyright (c) 2010-2017, Chef Software Inc.
+# Copyright:: Copyright (c) 2010-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,8 +14,8 @@
 # limitations under the License.
 #
 
-require "tmpdir"
-require "chef/mixin/shell_out"
+require "tmpdir" unless defined?(Dir.mktmpdir)
+require_relative "../mixin/shell_out"
 
 class Chef
   class Cookbook
@@ -38,8 +37,16 @@ class Chef
       def install
         cookbook_gems = Hash.new { |h, k| h[k] = [] }
 
-        cookbook_collection.each do |cookbook_name, cookbook_version|
+        cookbook_collection.each_value do |cookbook_version|
           cookbook_version.metadata.gems.each do |args|
+            if cookbook_gems[args.first].last.is_a?(Hash)
+              args << {} unless args.last.is_a?(Hash)
+              args.last.merge!(cookbook_gems[args.first].pop) do |key, v1, v2|
+                raise Chef::Exceptions::GemRequirementConflict.new(args.first, key, v1, v2) if v1 != v2
+
+                v2
+              end
+            end
             cookbook_gems[args.first] += args[1..-1]
           end
         end
@@ -57,8 +64,8 @@ class Chef
                   tf.puts "gem(*#{([gem_name] + args).inspect})"
                 end
                 tf.close
-                Chef::Log.debug("generated Gemfile contents:")
-                Chef::Log.debug(IO.read(tf.path))
+                Chef::Log.trace("generated Gemfile contents:")
+                Chef::Log.trace(IO.read(tf.path))
                 so = shell_out!("bundle install", cwd: dir, env: { "PATH" => path_with_prepended_ruby_bin })
                 Chef::Log.info(so.stdout)
               end

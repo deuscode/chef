@@ -15,22 +15,23 @@
 # limitations under the License.
 #
 
-require "singleton"
-require "pp"
-require "etc"
-require "mixlib/cli"
+require "singleton" unless defined?(Singleton)
+require "pp" unless defined?(PP)
+require "etc" unless defined?(Etc)
+require "mixlib/cli" unless defined?(Mixlib::CLI)
 
-require "chef"
-require "chef/version"
-require "chef/client"
-require "chef/config"
-require "chef/config_fetcher"
+require_relative "../chef"
+require_relative "version"
+require_relative "client"
+require_relative "config"
+require_relative "config_fetcher"
+require_relative "dist"
 
-require "chef/shell/shell_session"
-require "chef/workstation_config_loader"
-require "chef/shell/ext"
-require "chef/json_compat"
-require "chef/util/path_helper"
+require_relative "shell/shell_session"
+require_relative "workstation_config_loader"
+require_relative "shell/ext"
+require_relative "json_compat"
+require_relative "util/path_helper"
 
 # = Shell
 # Shell is Chef in an IRB session. Shell can interact with a Chef server via the
@@ -41,7 +42,6 @@ module Shell
   LEADERS[Chef::Node]   = ":attributes"
 
   class << self
-    attr_accessor :client_type
     attr_accessor :options
     attr_accessor :env
     attr_writer   :editor
@@ -138,6 +138,7 @@ module Shell
   def self.session
     unless client_type.instance.node_built?
       puts "Session type: #{client_type.session_type}"
+      client_type.instance.json_configuration = @json_attribs
       client_type.instance.reset!
     end
     client_type.instance
@@ -205,93 +206,94 @@ module Shell
       @footer
     end
 
-    banner("chef-shell #{Chef::VERSION}\n\nUsage: chef-shell [NAMED_CONF] (OPTIONS)")
+    banner("#{Chef::Dist::SHELL} #{Chef::VERSION}\n\nUsage: #{Chef::Dist::SHELL} [NAMED_CONF] (OPTIONS)")
 
-    footer(<<-FOOTER)
-When no CONFIG is specified, chef-shell attempts to load a default configuration file:
-* If a NAMED_CONF is given, chef-shell will load ~/.chef/NAMED_CONF/chef_shell.rb
-* If no NAMED_CONF is given chef-shell will load ~/.chef/chef_shell.rb if it exists
-* If no chef_shell.rb can be found, chef-shell falls back to load:
-      /etc/chef/client.rb if -z option is given.
-      /etc/chef/solo.rb   if --solo-legacy-mode option is given.
-      .chef/knife.rb      if -s option is given.
-FOOTER
+    footer(<<~FOOTER)
+      When no CONFIG is specified, #{Chef::Dist::SHELL} attempts to load a default configuration file:
+      * If a NAMED_CONF is given, #{Chef::Dist::SHELL} will load ~/#{Chef::Dist::USER_CONF_DIR}/NAMED_CONF/#{Chef::Dist::SHELL_CONF}
+      * If no NAMED_CONF is given #{Chef::Dist::SHELL} will load ~/#{Chef::Dist::USER_CONF_DIR}/#{Chef::Dist::SHELL_CONF} if it exists
+      * If no #{Chef::Dist::SHELL_CONF} can be found, #{Chef::Dist::SHELL} falls back to load:
+            #{Chef::Dist::CONF_DIR}/client.rb if -z option is given.
+            #{Chef::Dist::CONF_DIR}/solo.rb   if --solo-legacy-mode option is given.
+            #{Chef::Dist::USER_CONF_DIR}/config.rb     if -s option is given.
+            #{Chef::Dist::USER_CONF_DIR}/knife.rb      if -s option is given.
+    FOOTER
 
     option :config_file,
-      :short => "-c CONFIG",
-      :long  => "--config CONFIG",
-      :description => "The configuration file to use"
+      short: "-c CONFIG",
+      long: "--config CONFIG",
+      description: "The configuration file to use"
 
     option :help,
-      :short        => "-h",
-      :long         => "--help",
-      :description  => "Show this message",
-      :on           => :tail,
-      :boolean      => true,
-      :proc         => proc { print_help }
+      short: "-h",
+      long: "--help",
+      description: "Show this message",
+      on: :tail,
+      boolean: true,
+      proc: proc { print_help }
 
     option :log_level,
-      :short  => "-l LOG_LEVEL",
-      :long   => "--log-level LOG_LEVEL",
-      :description => "Set the logging level",
-      :proc         => proc { |level| Chef::Config.log_level = level.to_sym; Shell.setup_logger }
+      short: "-l LOG_LEVEL",
+      long: "--log-level LOG_LEVEL",
+      description: "Set the logging level",
+      proc: proc { |level| Chef::Config.log_level = level.to_sym; Shell.setup_logger }
 
     option :standalone,
-      :short        => "-a",
-      :long         => "--standalone",
-      :description  => "standalone session",
-      :default      => true,
-      :boolean      => true
+      short: "-a",
+      long: "--standalone",
+      description: "standalone session",
+      default: true,
+      boolean: true
 
     option :solo_shell,
-      :short        => "-s",
-      :long         => "--solo",
-      :description  => "chef-solo session",
-      :boolean      => true,
-      :proc         => proc { Chef::Config[:solo] = true }
+      short: "-s",
+      long: "--solo",
+      description: "#{Chef::Dist::SOLO} session",
+      boolean: true,
+      proc: proc { Chef::Config[:solo] = true }
 
     option :client,
-      :short        => "-z",
-      :long         => "--client",
-      :description  => "chef-client session",
-      :boolean      => true
+      short: "-z",
+      long: "--client",
+      description: "#{Chef::Dist::CLIENT} session",
+      boolean: true
 
     option :solo_legacy_shell,
-      :long         => "--solo-legacy-mode",
-      :description  => "chef-solo legacy session",
-      :boolean      => true,
-      :proc         => proc { Chef::Config[:solo_legacy_mode] = true }
+      long: "--solo-legacy-mode",
+      description: "#{Chef::Dist::SOLO} legacy session",
+      boolean: true,
+      proc: proc { Chef::Config[:solo_legacy_mode] = true }
 
     option :json_attribs,
-      :short => "-j JSON_ATTRIBS",
-      :long => "--json-attributes JSON_ATTRIBS",
-      :description => "Load attributes from a JSON file or URL",
-      :proc => nil
+      short: "-j JSON_ATTRIBS",
+      long: "--json-attributes JSON_ATTRIBS",
+      description: "Load attributes from a JSON file or URL",
+      proc: nil
 
     option :chef_server_url,
-      :short => "-S CHEFSERVERURL",
-      :long => "--server CHEFSERVERURL",
-      :description => "The chef server URL",
-      :proc => nil
+      short: "-S CHEFSERVERURL",
+      long: "--server CHEFSERVERURL",
+      description: "The #{Chef::Dist::PRODUCT} server URL",
+      proc: nil
 
     option :version,
-      :short        => "-v",
-      :long         => "--version",
-      :description  => "Show chef version",
-      :boolean      => true,
-      :proc         => lambda { |v| puts "Chef: #{::Chef::VERSION}" },
-      :exit         => 0
+      short: "-v",
+      long: "--version",
+      description: "Show #{Chef::Dist::PRODUCT} version",
+      boolean: true,
+      proc: lambda { |v| puts "#{Chef::Dist::PRODUCT}: #{::Chef::VERSION}" },
+      exit: 0
 
     option :override_runlist,
-      :short        => "-o RunlistItem,RunlistItem...",
-      :long         => "--override-runlist RunlistItem,RunlistItem...",
-      :description  => "Replace current run list with specified items",
-      :proc         => lambda { |items| items.split(",").map { |item| Chef::RunList::RunListItem.new(item) } }
+      short: "-o RunlistItem,RunlistItem...",
+      long: "--override-runlist RunlistItem,RunlistItem...",
+      description: "Replace current run list with specified items",
+      proc: lambda { |items| items.split(",").map { |item| Chef::RunList::RunListItem.new(item) } }
 
     option :skip_cookbook_sync,
-      :long           => "--[no-]skip-cookbook-sync",
-      :description    => "Use cached cookbooks without overwriting local differences from the server",
-      :boolean        => false
+      long: "--[no-]skip-cookbook-sync",
+      description: "Use cached cookbooks without overwriting local differences from the server",
+      boolean: false
 
     def self.print_help
       instance = new
@@ -328,18 +330,18 @@ FOOTER
         config[:config_file]
       elsif environment
         Shell.env = environment
-        config_file_to_try = ::File.join(dot_chef_dir, environment, "chef_shell.rb")
+        config_file_to_try = ::File.join(dot_chef_dir, environment, Chef::Dist::SHELL_CONF)
         unless ::File.exist?(config_file_to_try)
-          puts "could not find chef-shell config for environment #{environment} at #{config_file_to_try}"
+          puts "could not find #{Chef::Dist::SHELL} config for environment #{environment} at #{config_file_to_try}"
           exit 1
         end
         config_file_to_try
-      elsif dot_chef_dir && ::File.exist?(File.join(dot_chef_dir, "chef_shell.rb"))
-        File.join(dot_chef_dir, "chef_shell.rb")
+      elsif dot_chef_dir && ::File.exist?(File.join(dot_chef_dir, Chef::Dist::SHELL_CONF))
+        File.join(dot_chef_dir, Chef::Dist::SHELL_CONF)
       elsif config[:solo_legacy_shell]
-        Chef::Config.platform_specific_path("/etc/chef/solo.rb")
+        Chef::Config.platform_specific_path("#{Chef::Dist::CONF_DIR}/solo.rb")
       elsif config[:client]
-        Chef::Config.platform_specific_path("/etc/chef/client.rb")
+        Chef::Config.platform_specific_path("#{Chef::Dist::CONF_DIR}/client.rb")
       elsif config[:solo_shell]
         Chef::WorkstationConfigLoader.new(nil, Chef::Log).config_location
       else

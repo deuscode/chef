@@ -25,7 +25,7 @@ CHEF_ROOT = File.join(File.dirname(__FILE__), "..")
 begin
   require "rspec/core/rake_task"
 
-  desc "Run specs for Chef's Components"
+  desc "Run specs for Chef's Components (chef-config)"
   task :component_specs do
     Dir.chdir("chef-config") do
       Bundler.with_clean_env do
@@ -35,9 +35,9 @@ begin
     end
   end
 
-  task :default => :spec
+  task default: :spec
 
-  task :spec => :component_specs
+  task spec: :component_specs
 
   desc "Run standard specs (minus long running specs)"
   RSpec::Core::RakeTask.new(:spec) do |t|
@@ -77,7 +77,7 @@ begin
       t.pattern = FileList["spec/unit/node_spec.rb", "spec/unit/role_spec.rb"]
     end
 
-    [:unit, :functional, :integration, :stress].each do |sub|
+    %i{unit functional integration stress}.each do |sub|
       desc "Run the specs under spec/#{sub}"
       RSpec::Core::RakeTask.new(sub) do |t|
         t.rspec_opts = %w{--profile}

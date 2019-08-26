@@ -16,18 +16,18 @@
 # limitations under the License.
 #
 
-require "chef/knife"
+require_relative "../knife"
 
 class Chef
   class Knife
     class NodeDelete < Knife
 
       deps do
-        require "chef/node"
-        require "chef/json_compat"
+        require_relative "../node"
+        require_relative "../json_compat"
       end
 
-      banner "knife node delete [NODE[,NODE]] (options)"
+      banner "knife node delete [NODE [NODE]] (options)"
 
       def run
         if @name_args.length == 0

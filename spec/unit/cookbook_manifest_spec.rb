@@ -1,6 +1,6 @@
 #
 # Author:: Daniel DeLeo (<dan@chef.io>)
-# Copyright:: Copyright 2015-2016, Chef Software Inc.
+# Copyright:: Copyright 2015-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -89,10 +89,10 @@ describe Chef::CookbookManifest do
       {
         "chef_type" => "cookbook_version",
 
-        "name"          => "tatft-1.2.3",
-        "version"       => "1.2.3",
+        "name" => "tatft-1.2.3",
+        "version" => "1.2.3",
         "cookbook_name" => "tatft",
-        "metadata"      => metadata,
+        "metadata" => metadata,
 
         "frozen?" => false,
 
@@ -122,14 +122,16 @@ describe Chef::CookbookManifest do
         parts = relative_path.split("/")
         name = if %w{templates files}.include?(parts[0]) && parts.length == 3
                  File.join(parts[0], parts[2])
+               elsif parts.length == 1
+                 "root_files/#{parts[0]}"
                else
                  relative_path
                end
 
         {
-          "name"        => name,
-          "path"        => relative_path,
-          "checksum"    => Chef::Digester.generate_md5_checksum_for_file(path),
+          "name" => name,
+          "path" => relative_path,
+          "checksum" => Chef::Digester.generate_md5_checksum_for_file(path),
           "specificity" => "default",
         }.tap do |fp|
           if full
@@ -143,10 +145,10 @@ describe Chef::CookbookManifest do
       {
         "chef_type" => "cookbook_version",
 
-        "name"          => "tatft-1.2.3",
-        "version"       => "1.2.3",
+        "name" => "tatft-1.2.3",
+        "version" => "1.2.3",
         "cookbook_name" => "tatft",
-        "metadata"      => metadata,
+        "metadata" => metadata,
 
         "frozen?" => false,
 
@@ -162,7 +164,7 @@ describe Chef::CookbookManifest do
       cookbook_manifest_hash = cookbook_manifest.to_hash
 
       expect(cookbook_manifest_hash.keys).to match_array(expected_hash.keys)
-      cookbook_manifest_hash.each do |key, value|
+      cookbook_manifest_hash.each_key do |key|
         expect(cookbook_manifest_hash[key]).to eq(expected_hash[key])
       end
     end

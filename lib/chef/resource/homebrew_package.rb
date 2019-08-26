@@ -18,8 +18,9 @@
 # limitations under the License.
 #
 
-require "chef/provider/package"
-require "chef/resource/package"
+require_relative "../provider/package"
+require_relative "package"
+require_relative "../dist"
 
 class Chef
   class Resource
@@ -27,7 +28,11 @@ class Chef
       resource_name :homebrew_package
       provides :package, os: "darwin"
 
-      property :homebrew_user, [ String, Integer ]
+      description "Use the homebrew_package resource to manage packages for the macOS platform."
+      introduced "12.0"
+
+      property :homebrew_user, [ String, Integer ],
+        description: "The name of the Homebrew owner to be used by the #{Chef::Dist::CLIENT} when executing a command."
 
     end
   end

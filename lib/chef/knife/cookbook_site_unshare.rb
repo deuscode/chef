@@ -1,7 +1,7 @@
 #
 # Author:: Stephen Delano (<stephen@chef.io>)
 # Author:: Tim Hinderliter (<tim@chef.io>)
-# Copyright:: Copyright 2010-2016, Chef Software Inc.
+# Copyright:: Copyright 2010-2019, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,45 +17,23 @@
 # limitations under the License.
 #
 
-require "chef/knife"
+require_relative "../knife"
+require_relative "supermarket_unshare"
+require_relative "../dist"
 
 class Chef
   class Knife
-    class CookbookSiteUnshare < Knife
+    class CookbookSiteUnshare < Knife::SupermarketUnshare
 
-      deps do
-        require "chef/json_compat"
-      end
+    # Handle the subclassing (knife doesn't do this :()
+      dependency_loaders.concat(superclass.dependency_loaders)
 
-      banner "knife cookbook site unshare COOKBOOK"
-      category "cookbook site"
-
-      option :supermarket_site,
-        :short => "-m SUPERMARKET_SITE",
-        :long => "--supermarket-site SUPERMARKET_SITE",
-        :description => "Supermarket Site",
-        :default => "https://supermarket.chef.io",
-        :proc => Proc.new { |supermarket| Chef::Config[:knife][:supermarket_site] = supermarket }
+      banner "knife cookbook site unshare COOKBOOK (options)"
+      category "deprecated"
 
       def run
-        @cookbook_name = @name_args[0]
-        if @cookbook_name.nil?
-          show_usage
-          ui.fatal "You must provide the name of the cookbook to unshare"
-          exit 1
-        end
-
-        confirm "Do you really want to unshare all versions of the cookbook #{@cookbook_name}"
-
-        begin
-          rest.delete "#{config[:supermarket_site]}/api/v1/cookbooks/#{@name_args[0]}"
-        rescue Net::HTTPServerException => e
-          raise e unless e.message =~ /Forbidden/
-          ui.error "Forbidden: You must be the maintainer of #{@cookbook_name} to unshare it."
-          exit 1
-        end
-
-        ui.info "Unshared all versions of the cookbook #{@cookbook_name}"
+        Chef::Log.warn("knife cookbook site unshare has been deprecated in favor of knife supermarket unshare. In #{Chef::Dist::PRODUCT} 16 (April 2020) this will result in an error!")
+        super
       end
 
     end

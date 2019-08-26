@@ -16,8 +16,8 @@
 # limitations under the License.
 #
 
-require "chef/knife/core/text_formatter"
-require "chef/knife/core/generic_presenter"
+require_relative "text_formatter"
+require_relative "generic_presenter"
 
 class Chef
   class Knife
@@ -26,29 +26,28 @@ class Chef
       # This module may be included into a knife subcommand class to automatically
       # add configuration options used by the StatusPresenter
       module StatusFormattingOptions
-        # :nodoc:
+        # @private
         # Would prefer to do this in a rational way, but can't be done b/c of
         # Mixlib::CLI's design :(
         def self.included(includer)
           includer.class_eval do
             option :medium_output,
-              :short   => "-m",
-              :long    => "--medium",
-              :boolean => true,
-              :default => false,
-              :description => "Include normal attributes in the output"
+              short: "-m",
+              long: "--medium",
+              boolean: true,
+              default: false,
+              description: "Include normal attributes in the output"
 
             option :long_output,
-              :short   => "-l",
-              :long    => "--long",
-              :boolean => true,
-              :default => false,
-              :description => "Include all attributes in the output"
+              short: "-l",
+              long: "--long",
+              boolean: true,
+              default: false,
+              description: "Include all attributes in the output"
           end
         end
       end
 
-      #==Chef::Knife::Core::StatusPresenter
       # A customized presenter for Chef::Node objects. Supports variable-length
       # output formats for displaying node data
       class StatusPresenter < GenericPresenter
@@ -101,31 +100,47 @@ class Chef
             fqdn = (node[:ec2] && node[:ec2][:public_hostname]) || node[:fqdn]
             name = node["name"] || node.name
 
-            hours, minutes, = time_difference_in_hms(node["ohai_time"])
-            hours_text   = "#{hours} hour#{hours == 1 ? ' ' : 's'}"
-            minutes_text = "#{minutes} minute#{minutes == 1 ? ' ' : 's'}"
-            run_list = "#{node['run_list']}" if config[:run_list]
-            if hours > 24
-              color = :red
-              text = hours_text
-            elsif hours >= 1
-              color = :yellow
-              text = hours_text
-            else
-              color = :green
-              text = minutes_text
+            if config[:run_list]
+              if config[:long_output]
+                run_list = node.run_list.map { |rl| "#{rl.type}[#{rl.name}]" }
+              else
+                run_list = node["run_list"]
+              end
             end
 
-            line_parts = Array.new
-            line_parts << @ui.color(text, color) + " ago" << name
+            line_parts = []
+
+            if node["ohai_time"]
+              hours, minutes, seconds = time_difference_in_hms(node["ohai_time"])
+              hours_text   = "#{hours} hour#{hours == 1 ? " " : "s"}"
+              minutes_text = "#{minutes} minute#{minutes == 1 ? " " : "s"}"
+              seconds_text = "#{seconds} second#{seconds == 1 ? " " : "s"}"
+              if hours > 24
+                color = :red
+                text = hours_text
+              elsif hours >= 1
+                color = :yellow
+                text = hours_text
+              elsif minutes >= 1
+                color = :green
+                text = minutes_text
+              else
+                color = :green
+                text = seconds_text
+              end
+              line_parts << @ui.color(text, color) + " ago" << name
+            else
+              line_parts << "Node #{name} has not yet converged"
+            end
+
             line_parts << fqdn if fqdn
             line_parts << ip if ip
-            line_parts << run_list if run_list
+            line_parts << run_list.to_s if run_list
 
             if node["platform"]
-              platform = node["platform"]
+              platform = node["platform"].dup
               if node["platform_version"]
-                platform << " #{node['platform_version']}"
+                platform << " #{node["platform_version"]}"
               end
               line_parts << platform
             end
@@ -139,8 +154,8 @@ class Chef
           ui.color(key_text, :cyan)
         end
 
-        # :nodoc:
-        # TODO: this is duplicated from StatusHelper in the Webui. dedup.
+        # @private
+        # @todo this is duplicated from StatusHelper in the Webui. dedup.
         def time_difference_in_hms(unix_time)
           now = Time.now.to_i
           difference = now - unix_time.to_i

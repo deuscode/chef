@@ -1,6 +1,6 @@
 #
 # Author:: Dreamcat4 (<dreamcat4@gmail.com>)
-# Copyright:: Copyright 2009-2016, Chef Software Inc.
+# Copyright:: Copyright 2009-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,21 +19,24 @@
 require "spec_helper"
 
 describe Chef::Provider::Group::Dscl do
+  let(:logger) { double("Mixlib::Log::Child").as_null_object }
+
   before do
     @node = Chef::Node.new
     @events = Chef::EventDispatch::Dispatcher.new
     @run_context = Chef::RunContext.new(@node, {}, @events)
+    allow(@run_context).to receive(:logger).and_return(logger)
     @new_resource = Chef::Resource::Group.new("aj")
     @current_resource = Chef::Resource::Group.new("aj")
     @provider = Chef::Provider::Group::Dscl.new(@new_resource, @run_context)
     @provider.current_resource = @current_resource
 
     @status = double(stdout: "\n", stderr: "", exitstatus: 0)
-    allow(@provider).to receive(:shell_out).and_return(@status)
+    allow(@provider).to receive(:shell_out_compacted).and_return(@status)
   end
 
   it "should run shell_out with the supplied array of arguments appended to the dscl command" do
-    expect(@provider).to receive(:shell_out).with("dscl", ".", "-cmd", "/Path", "arg1", "arg2")
+    expect(@provider).to receive(:shell_out_compacted).with("dscl", ".", "-cmd", "/Path", "arg1", "arg2")
     @provider.dscl("cmd", "/Path", "arg1", "arg2")
   end
 
@@ -45,8 +48,7 @@ describe Chef::Provider::Group::Dscl do
 
   describe "safe_dscl" do
     before do
-      @node = Chef::Node.new
-      @provider = Chef::Provider::Group::Dscl.new(@node, @new_resource)
+      @provider = Chef::Provider::Group::Dscl.new(@new_resource, @run_context)
       allow(@provider).to receive(:dscl).and_return(["cmd", @status, "stdout", "stderr"])
     end
 
@@ -93,8 +95,7 @@ describe Chef::Provider::Group::Dscl do
 
   describe "get_free_gid" do
     before do
-      @node = Chef::Node.new
-      @provider = Chef::Provider::Group::Dscl.new(@node, @new_resource)
+      @provider = Chef::Provider::Group::Dscl.new(@new_resource, @run_context)
       allow(@provider).to receive(:safe_dscl).and_return("\naj      200\njt      201\n")
     end
 
@@ -115,13 +116,16 @@ describe Chef::Provider::Group::Dscl do
 
   describe "gid_used?" do
     before do
-      @node = Chef::Node.new
-      @provider = Chef::Provider::Group::Dscl.new(@node, @new_resource)
-      allow(@provider).to receive(:safe_dscl).and_return("\naj      500\n")
+      allow(@provider).to receive(:safe_dscl).and_return(<<-EOS
+        someprogram		somethingElse:gid = (
+            500
+        )
+      EOS
+                                                        )
     end
 
-    it "should run safe_dscl with list /Groups gid" do
-      expect(@provider).to receive(:safe_dscl).with(*"list /Groups gid".split(" "))
+    it "should run safe_dscl with search /Groups gid" do
+      expect(@provider).to receive(:safe_dscl).with(*"search /Groups PrimaryGroupID 500".split(" "))
       @provider.gid_used?(500)
     end
 
@@ -130,7 +134,11 @@ describe Chef::Provider::Group::Dscl do
     end
 
     it "should return false for an unused gid number" do
-      expect(@provider.gid_used?(501)).to be_falsey
+      expect(@provider.gid_used?(0)).to be_falsey
+      expect(@provider.gid_used?(50)).to be_falsey
+      expect(@provider.gid_used?(5000)).to be_falsey
+      expect(@provider.gid_used?(1500)).to be_falsey
+      expect(@provider.gid_used?(18)).to be_falsey
     end
 
     it "should return false if not given any valid gid number" do
@@ -171,7 +179,7 @@ describe Chef::Provider::Group::Dscl do
     describe "with a valid gid number which is not already in use" do
       it "should run safe_dscl with create /Groups/group PrimaryGroupID gid" do
         allow(@provider).to receive(:get_free_gid).and_return(50)
-        expect(@provider).to receive(:safe_dscl).with(*"list /Groups gid".split(" "))
+        expect(@provider).to receive(:safe_dscl).with(*"search /Groups PrimaryGroupID 50".split(" ")).and_return("")
         expect(@provider).to receive(:safe_dscl).with("create", "/Groups/aj", "PrimaryGroupID", 50).and_return(true)
         @provider.set_gid
       end
@@ -188,7 +196,7 @@ describe Chef::Provider::Group::Dscl do
       end
 
       it "should log an appropriate message" do
-        expect(Chef::Log).to receive(:debug).with("group[aj] removing group members all your base")
+        expect(logger).to receive(:trace).with("group[aj] removing group members all your base")
         @provider.set_members
       end
 
@@ -206,7 +214,7 @@ describe Chef::Provider::Group::Dscl do
       end
 
       it "should log an appropriate debug message" do
-        expect(Chef::Log).to receive(:debug).with("group[aj] setting group members all, your, base")
+        expect(logger).to receive(:trace).with("group[aj] setting group members all, your, base")
         @provider.set_members
       end
 
@@ -301,20 +309,20 @@ describe "Test DSCL loading" do
     @new_resource = Chef::Resource::Group.new("group name aj")
     @new_resource.group_name("aj")
     @provider = Chef::Provider::Group::Dscl.new(@new_resource, @run_context)
-    @output = <<-EOF
-AppleMetaNodeLocation: /Local/Default
-Comment:
- Test Group
-GeneratedUID: AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA
-NestedGroups: AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAB
-Password: *
-PrimaryGroupID: 999
-RealName:
- TestGroup
-RecordName: com.apple.aj
-RecordType: dsRecTypeStandard:Groups
-GroupMembership: waka bar
-EOF
+    @output = <<~EOF
+      AppleMetaNodeLocation: /Local/Default
+      Comment:
+       Test Group
+      GeneratedUID: AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA
+      NestedGroups: AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAB
+      Password: *
+      PrimaryGroupID: 999
+      RealName:
+       TestGroup
+      RecordName: com.apple.aj
+      RecordType: dsRecTypeStandard:Groups
+      GroupMembership: waka bar
+    EOF
     allow(@provider).to receive(:safe_dscl).with(*"read /Groups/aj".split(" ")).and_return(@output)
     @current_resource = @provider.load_current_resource
 

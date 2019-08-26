@@ -1,6 +1,6 @@
 #
 # Author:: Dreamcat4 (<dreamcat4@gmail.com>)
-# Copyright:: Copyright 2009-2017, Chef Software Inc.
+# Copyright:: Copyright 2009-2019, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,11 +16,12 @@
 # limitations under the License.
 #
 
-require "mixlib/shellout"
-require "chef/provider/user"
-require "openssl"
+require_relative "../../mixin/shell_out"
+require_relative "../user"
+require_relative "../../resource/user/dscl_user"
+require "openssl" unless defined?(OpenSSL)
 require "plist"
-require "chef/util/path_helper"
+require_relative "../../util/path_helper"
 
 class Chef
   class Provider
@@ -60,11 +61,6 @@ class Chef
           super
 
           requirements.assert(:all_actions) do |a|
-            a.assertion { mac_osx_version_less_than_10_7? == false }
-            a.failure_message(Chef::Exceptions::User, "Chef::Provider::User::Dscl only supports Mac OS X versions 10.7 and above.")
-          end
-
-          requirements.assert(:all_actions) do |a|
             a.assertion { ::File.exist?("/usr/bin/dscl") }
             a.failure_message(Chef::Exceptions::User, "Cannot find binary '/usr/bin/dscl' on the system for #{new_resource}!")
           end
@@ -76,7 +72,7 @@ class Chef
 
           requirements.assert(:create, :modify, :manage) do |a|
             a.assertion do
-              if new_resource.password && mac_osx_version_greater_than_10_7?
+              if new_resource.password
                 # SALTED-SHA512 password shadow hashes are not supported on 10.8 and above.
                 !salted_sha512?(new_resource.password)
               else
@@ -90,7 +86,7 @@ in 'password', with the associated 'salt' and 'iterations'.")
 
           requirements.assert(:create, :modify, :manage) do |a|
             a.assertion do
-              if new_resource.password && mac_osx_version_greater_than_10_7? && salted_sha512_pbkdf2?(new_resource.password)
+              if new_resource.password && salted_sha512_pbkdf2?(new_resource.password)
                 # salt and iterations should be specified when
                 # SALTED-SHA512-PBKDF2 password shadow hash is given
                 !new_resource.salt.nil? && !new_resource.iterations.nil?
@@ -101,24 +97,10 @@ in 'password', with the associated 'salt' and 'iterations'.")
             a.failure_message(Chef::Exceptions::User, "SALTED-SHA512-PBKDF2 shadow hash is given without associated \
 'salt' and 'iterations'. Please specify 'salt' and 'iterations' in order to set the user password using shadow hash.")
           end
-
-          requirements.assert(:create, :modify, :manage) do |a|
-            a.assertion do
-              if new_resource.password && !mac_osx_version_greater_than_10_7?
-                # On 10.7 SALTED-SHA512-PBKDF2 is not supported
-                !salted_sha512_pbkdf2?(new_resource.password)
-              else
-                true
-              end
-            end
-            a.failure_message(Chef::Exceptions::User, "SALTED-SHA512-PBKDF2 shadow hashes are not supported on \
-Mac OS X version 10.7. Please specify a SALTED-SHA512 shadow hash in 'password' attribute to set the \
-user password using shadow hash.")
-          end
         end
 
         def load_current_resource
-          @current_resource = Chef::Resource::User.new(new_resource.username)
+          @current_resource = Chef::Resource::User::DsclUser.new(new_resource.username)
           current_resource.username(new_resource.username)
 
           @user_info = read_user_info
@@ -138,11 +120,7 @@ user password using shadow hash.")
               shadow_hash_xml = convert_binary_plist_to_xml(shadow_hash_binary.string)
               shadow_hash = Plist.parse_xml(shadow_hash_xml)
 
-              if shadow_hash["SALTED-SHA512"]
-                # Convert the shadow value from Base64 encoding to hex before consuming them
-                @password_shadow_conversion_algorithm = "SALTED-SHA512"
-                current_resource.password(shadow_hash["SALTED-SHA512"].string.unpack("H*").first)
-              elsif shadow_hash["SALTED-SHA512-PBKDF2"]
+              if shadow_hash["SALTED-SHA512-PBKDF2"] # 10.7+ contains this, but we retain the check in case it goes away in the future
                 @password_shadow_conversion_algorithm = "SALTED-SHA512-PBKDF2"
                 # Convert the entropy from Base64 encoding to hex before consuming them
                 current_resource.password(shadow_hash["SALTED-SHA512-PBKDF2"]["entropy"].string.unpack("H*").first)
@@ -150,14 +128,14 @@ user password using shadow hash.")
                 # Convert the salt from Base64 encoding to hex before consuming them
                 current_resource.salt(shadow_hash["SALTED-SHA512-PBKDF2"]["salt"].string.unpack("H*").first)
               else
-                raise(Chef::Exceptions::User, "Unknown shadow_hash format: #{shadow_hash.keys.join(' ')}")
+                raise(Chef::Exceptions::User, "Unknown shadow_hash format: #{shadow_hash.keys.join(" ")}")
               end
             end
 
             convert_group_name if new_resource.gid
           else
             @user_exists = false
-            Chef::Log.debug("#{new_resource} user does not exist")
+            logger.trace("#{new_resource} user does not exist")
           end
 
           current_resource
@@ -214,7 +192,7 @@ user password using shadow hash.")
         #
         # Sets the user id for the user using dscl.
         # If a `uid` is not specified, it finds the next available one starting
-        # from 200 if `system` is set, 500 otherwise.
+        # from 200 if `system` is set, 501 otherwise.
         #
         def dscl_set_uid
           # XXX: mutates the new resource
@@ -229,11 +207,11 @@ user password using shadow hash.")
 
         #
         # Find the next available uid on the system. starting with 200 if `system` is set,
-        # 500 otherwise.
+        # 501 otherwise.
         #
         def get_free_uid(search_limit = 1000)
           uid = nil
-          base_uid = new_resource.system ? 200 : 500
+          base_uid = new_resource.system ? 200 : 501
           next_uid_guess = base_uid
           users_uids = run_dscl("list", "/Users", "uid")
           while next_uid_guess < search_limit + base_uid
@@ -252,6 +230,7 @@ user password using shadow hash.")
         #
         def uid_used?(uid)
           return false unless uid
+
           users_uids = run_dscl("list", "/Users", "uid").split("\n")
           uid_map = users_uids.each_with_object({}) do |tuid, tmap|
             x = tuid.split
@@ -312,13 +291,13 @@ user password using shadow hash.")
         end
 
         def validate_home_dir_specification!
-          unless new_resource.home =~ /^\//
+          unless new_resource.home =~ %r{^/}
             raise(Chef::Exceptions::InvalidHomeDirectory, "invalid path spec for User: '#{new_resource.username}', home directory: '#{new_resource.home}'")
           end
         end
 
         def current_home_exists?
-          ::File.exist?(current_resource.home)
+          !!current_resource.home && ::File.exist?(current_resource.home)
         end
 
         def new_home_exists?
@@ -326,14 +305,11 @@ user password using shadow hash.")
         end
 
         def ditto_home
-          skel = "/System/Library/User Template/English.lproj"
-          raise(Chef::Exceptions::User, "can't find skel at: #{skel}") unless ::File.exist?(skel)
-          shell_out_compact!("ditto", skel, new_resource.home)
-          ::FileUtils.chown_R(new_resource.username, new_resource.gid.to_s, new_resource.home)
+          shell_out!("/usr/sbin/createhomedir", "-c", "-u", (new_resource.username).to_s)
         end
 
         def move_home
-          Chef::Log.debug("#{new_resource} moving #{self} home from #{current_resource.home} to #{new_resource.home}")
+          logger.trace("#{new_resource} moving #{self} home from #{current_resource.home} to #{new_resource.home}")
           new_resource.gid(STAFF_GROUP_ID) if new_resource.gid.nil?
           src = current_resource.home
           FileUtils.mkdir_p(new_resource.home)
@@ -367,8 +343,8 @@ user password using shadow hash.")
 
           # Shadow info is saved as binary plist. Convert the info to binary plist.
           shadow_info_binary = StringIO.new
-          shell_out_compact("plutil", "-convert", "binary1", "-o", "-", "-",
-                            input: shadow_info.to_plist, live_stream: shadow_info_binary)
+          shell_out("plutil", "-convert", "binary1", "-o", "-", "-",
+            input: shadow_info.to_plist, live_stream: shadow_info_binary)
 
           if user_info.nil?
             # User is  just created. read_user_info() will read the fresh information
@@ -393,47 +369,31 @@ user password using shadow hash.")
           salt = nil
           iterations = nil
 
-          if mac_osx_version_10_7?
-            hash_value = if salted_sha512?(new_resource.password)
-                           new_resource.password
-                         else
-                           # Create a random 4 byte salt
-                           salt = OpenSSL::Random.random_bytes(4)
-                           encoded_password = OpenSSL::Digest::SHA512.hexdigest(salt + new_resource.password)
-                           salt.unpack("H*").first + encoded_password
-                         end
-
-            shadow_info["SALTED-SHA512"] = StringIO.new
-            shadow_info["SALTED-SHA512"].string = convert_to_binary(hash_value)
-            shadow_info
+          if salted_sha512_pbkdf2?(new_resource.password)
+            entropy = convert_to_binary(new_resource.password)
+            salt = convert_to_binary(new_resource.salt)
+            iterations = new_resource.iterations
           else
-            if salted_sha512_pbkdf2?(new_resource.password)
-              entropy = convert_to_binary(new_resource.password)
-              salt = convert_to_binary(new_resource.salt)
-              iterations = new_resource.iterations
-            else
-              salt = OpenSSL::Random.random_bytes(32)
-              iterations = new_resource.iterations # Use the default if not specified by the user
+            salt = OpenSSL::Random.random_bytes(32)
+            iterations = new_resource.iterations # Use the default if not specified by the user
 
-              entropy = OpenSSL::PKCS5.pbkdf2_hmac(
-                new_resource.password,
-                salt,
-                iterations,
-                128,
-                OpenSSL::Digest::SHA512.new
-              )
-            end
-
-            pbkdf_info = {}
-            pbkdf_info["entropy"] = StringIO.new
-            pbkdf_info["entropy"].string = entropy
-            pbkdf_info["salt"] = StringIO.new
-            pbkdf_info["salt"].string = salt
-            pbkdf_info["iterations"] = iterations
-
-            shadow_info["SALTED-SHA512-PBKDF2"] = pbkdf_info
+            entropy = OpenSSL::PKCS5.pbkdf2_hmac(
+              new_resource.password,
+              salt,
+              iterations,
+              128,
+              OpenSSL::Digest::SHA512.new
+            )
           end
 
+          pbkdf_info = {}
+          pbkdf_info["entropy"] = StringIO.new
+          pbkdf_info["entropy"].string = entropy
+          pbkdf_info["salt"] = StringIO.new
+          pbkdf_info["salt"].string = salt
+          pbkdf_info["iterations"] = iterations
+
+          shadow_info["SALTED-SHA512-PBKDF2"] = pbkdf_info
           shadow_info
         end
 
@@ -518,29 +478,16 @@ user password using shadow hash.")
           return false if new_resource.password.nil?
 
           # Dscl provider supports both plain text passwords and shadow hashes.
-          if mac_osx_version_10_7?
-            if salted_sha512?(new_resource.password)
-              diverged?(:password)
-            else
-              !salted_sha512_password_match?
-            end
+          #
+          # Some system users don't have salts; this can happen if the system is
+          # upgraded and the user hasn't logged in yet. In this case, we will force
+          # the password to be updated.
+          return true if current_resource.salt.nil?
+
+          if salted_sha512_pbkdf2?(new_resource.password)
+            diverged?(:password) || diverged?(:salt) || diverged?(:iterations)
           else
-            # When a system is upgraded to a version 10.7+ shadow hashes of the users
-            # will be updated when the user logs in. So it's possible that we will have
-            # SALTED-SHA512 password in the current_resource. In that case we will force
-            # password to be updated.
-            return true if salted_sha512?(current_resource.password)
-
-            # Some system users don't have salts; this can happen if the system is
-            # upgraded and the user hasn't logged in yet. In this case, we will force
-            # the password to be updated.
-            return true if current_resource.salt.nil?
-
-            if salted_sha512_pbkdf2?(new_resource.password)
-              diverged?(:password) || diverged?(:salt) || diverged?(:iterations)
-            else
-              !salted_sha512_pbkdf2_password_match?
-            end
+            !salted_sha512_pbkdf2_password_match?
           end
         end
 
@@ -589,7 +536,7 @@ user password using shadow hash.")
 
           # We flush the cache here in order to make sure that we read fresh information
           # for the user.
-          shell_out_compact("dscacheutil", "-flushcache") # FIXME: this is MacOS version dependent
+          shell_out("dscacheutil", "-flushcache") # FIXME: this is MacOS version dependent
 
           begin
             user_plist_file = "#{USER_PLIST_DIRECTORY}/#{new_resource.username}.plist"
@@ -616,6 +563,7 @@ user password using shadow hash.")
         #
         def dscl_set(user_hash, key, value)
           raise "Unknown dscl key #{key}" unless DSCL_PROPERTY_MAP.keys.include?(key)
+
           user_hash[DSCL_PROPERTY_MAP[key]] = [ value ]
           user_hash
         end
@@ -625,52 +573,29 @@ user password using shadow hash.")
         #
         def dscl_get(user_hash, key)
           raise "Unknown dscl key #{key}" unless DSCL_PROPERTY_MAP.keys.include?(key)
+
           # DSCL values are set as arrays
           value = user_hash[DSCL_PROPERTY_MAP[key]]
           value.nil? ? value : value.first
         end
 
         #
-        # System Helpets
+        # System Helpers
         #
 
-        def mac_osx_version
-          # This provider will only be invoked on node[:platform] == "mac_os_x"
-          # We do not check or assert that here.
-          node[:platform_version]
-        end
-
-        def mac_osx_version_10_7?
-          mac_osx_version.start_with?("10.7.")
-        end
-
-        def mac_osx_version_less_than_10_7?
-          versions = mac_osx_version.split(".")
-          # Make integer comparison in order not to report 10.10 less than 10.7
-          (versions[0].to_i <= 10 && versions[1].to_i < 7)
-        end
-
-        def mac_osx_version_greater_than_10_7?
-          versions = mac_osx_version.split(".")
-          # Make integer comparison in order not to report 10.10 less than 10.7
-          (versions[0].to_i >= 10 && versions[1].to_i > 7)
-        end
-
         def run_dscl(*args)
-          argdup = args.dup
-          cmd = argdup.shift
-          result = shell_out_compact("dscl", ".", "-#{cmd}", argdup)
+          result = shell_out("dscl", ".", "-#{args[0]}", args[1..-1])
           return "" if ( args.first =~ /^delete/ ) && ( result.exitstatus != 0 )
           raise(Chef::Exceptions::DsclCommandFailed, "dscl error: #{result.inspect}") unless result.exitstatus == 0
           raise(Chef::Exceptions::DsclCommandFailed, "dscl error: #{result.inspect}") if result.stdout =~ /No such key: /
+
           result.stdout
         end
 
         def run_plutil(*args)
-          argdup = args.dup
-          cmd = argdup.shift
-          result = shell_out_compact("plutil", "-#{cmd}", argdup)
+          result = shell_out("plutil", "-#{args[0]}", args[1..-1])
           raise(Chef::Exceptions::PlistUtilCommandFailed, "plutil error: #{result.inspect}") unless result.exitstatus == 0
+
           if result.stdout.encoding == Encoding::ASCII_8BIT
             result.stdout.encode("utf-8", "binary", undef: :replace, invalid: :replace, replace: "?")
           else
@@ -679,7 +604,7 @@ user password using shadow hash.")
         end
 
         def convert_binary_plist_to_xml(binary_plist_string)
-          shell_out_compact("plutil", "-convert", "xml1", "-o", "-", "-", input: binary_plist_string).stdout
+          shell_out("plutil", "-convert", "xml1", "-o", "-", "-", input: binary_plist_string).stdout
         end
 
         def convert_to_binary(string)
@@ -688,13 +613,6 @@ user password using shadow hash.")
 
         def salted_sha512?(string)
           !!(string =~ /^[[:xdigit:]]{136}$/)
-        end
-
-        def salted_sha512_password_match?
-          # Salt is included in the first 4 bytes of shadow data
-          salt = current_resource.password.slice(0, 8)
-          shadow = OpenSSL::Digest::SHA512.hexdigest(convert_to_binary(salt) + new_resource.password)
-          current_resource.password == salt + shadow
         end
 
         def salted_sha512_pbkdf2?(string)

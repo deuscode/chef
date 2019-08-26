@@ -16,7 +16,7 @@
 # limitations under the License.
 #
 
-require "chef/chef_fs/file_system_cache"
+require_relative "../../file_system_cache"
 
 class Chef
   module ChefFS
@@ -43,12 +43,12 @@ class Chef
 
             file_path = "#{parent.file_path}/#{name}"
 
-            Chef::Log.debug "BaseFile: Detecting file extension for #{name}"
+            Chef::Log.trace "BaseFile: Detecting file extension for #{name}"
             ext = File.exist?(file_path + ".rb") ? ".rb" : ".json"
             name += ext
             file_path += ext
 
-            Chef::Log.debug "BaseFile: got a file path of #{file_path} for #{name}"
+            Chef::Log.trace "BaseFile: got a file path of #{file_path} for #{name}"
             @name = name
             @path = Chef::ChefFS::PathUtils.join(parent.path, name)
             @file_path = file_path
@@ -122,7 +122,7 @@ class Chef
             if is_ruby_file?
               data_handler.from_ruby(file_path).to_json
             else
-              File.open(file_path, "rb") { |f| f.read }
+              File.open(file_path, "rb", &:read)
             end
           rescue Errno::ENOENT
             raise Chef::ChefFS::FileSystem::NotFoundError.new(self, $!)
@@ -132,6 +132,7 @@ class Chef
             if is_ruby_file?
               raise Chef::ChefFS::FileSystem::RubyFileError.new(:write, self)
             end
+
             if content && write_pretty_json && is_json_file?
               content = minimize(content, self)
             end

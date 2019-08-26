@@ -1,6 +1,6 @@
 #
 # Author:: Adam Edwards (<adamed@chef.io>)
-# Copyright:: Copyright 2014-2016, Chef Software Inc.
+# Copyright:: Copyright 2014-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +16,7 @@
 # limitations under the License.
 #
 
-require "chef/guard_interpreter"
+require_relative "../guard_interpreter"
 
 class Chef
   class GuardInterpreter
@@ -36,15 +36,15 @@ class Chef
         # Only execute and script resources and use guard attributes.
         # The command to be executed on them are passed via different attributes.
         # Script resources use code attribute and execute resources use
-        # command attribute. Moreover script resources are also execute
+        # command property. Moreover script resources are also execute
         # resources. Here we make sure @command is assigned to the right
         # attribute by checking the type of the resources.
         # We need to make sure we check for Script first because any resource
         # that can get to here is an Execute resource.
         if @resource.is_a? Chef::Resource::Script
-          block_attributes = @command_opts.merge({ :code => @command })
+          block_attributes = @command_opts.merge({ code: @command })
         else
-          block_attributes = @command_opts.merge({ :command => @command })
+          block_attributes = @command_opts.merge({ command: @command })
         end
 
         # Handles cases like powershell_script where default
@@ -91,7 +91,7 @@ class Chef
           raise ArgumentError, "Specified guard_interpreter resource #{parent_resource.guard_interpreter} unknown for this platform"
         end
 
-        if ! resource_class.ancestors.include?(Chef::Resource::Execute)
+        unless resource_class.ancestors.include?(Chef::Resource::Execute)
           raise ArgumentError, "Specified guard interpreter class #{resource_class} must be a kind of Chef::Resource::Execute resource"
         end
 
@@ -108,7 +108,7 @@ class Chef
 
       def block_from_attributes(attributes)
         Proc.new do
-          attributes.keys.each do |attribute_name|
+          attributes.each_key do |attribute_name|
             send(attribute_name, attributes[attribute_name]) if respond_to?(attribute_name)
           end
         end

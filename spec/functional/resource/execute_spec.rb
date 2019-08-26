@@ -1,6 +1,6 @@
 #
 # Author:: Serdar Sutay (<serdar@chef.io>)
-# Copyright:: Copyright 2014-2016, Chef Software Inc.
+# Copyright:: Copyright 2014-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -87,8 +87,8 @@ describe Chef::Resource::Execute do
   describe "when parent resource sets :environment" do
     before do
       resource.environment({
-        "SAWS_SECRET"  => "supersecret",
-        "SAWS_KEY"     => "qwerty",
+        "SAWS_SECRET" => "supersecret",
+        "SAWS_KEY" => "qwerty",
       })
     end
 
@@ -106,7 +106,7 @@ describe Chef::Resource::Execute do
 
     it "guard adds additional values in its :environment and runs" do
       resource.only_if %{ruby -e 'exit 1 if ENV["SGCE_SECRET"] != "regularsecret"'}, {
-        :environment => { "SGCE_SECRET" => "regularsecret" },
+        environment: { "SGCE_SECRET" => "regularsecret" },
       }
       resource.run_action(:run)
       expect(resource).to be_updated_by_last_action
@@ -114,7 +114,7 @@ describe Chef::Resource::Execute do
 
     it "guard adds additional values in its :environment and does not run" do
       resource.only_if %{ruby -e 'exit 1 if ENV["SGCE_SECRET"] == "regularsecret"'}, {
-        :environment => { "SGCE_SECRET" => "regularsecret" },
+        environment: { "SGCE_SECRET" => "regularsecret" },
       }
       resource.run_action(:run)
       expect(resource).not_to be_updated_by_last_action
@@ -122,7 +122,7 @@ describe Chef::Resource::Execute do
 
     it "guard overwrites value with its :environment and runs" do
       resource.only_if %{ruby -e 'exit 1 if ENV["SAWS_SECRET"] != "regularsecret"'}, {
-        :environment => { "SAWS_SECRET" => "regularsecret" },
+        environment: { "SAWS_SECRET" => "regularsecret" },
       }
       resource.run_action(:run)
       expect(resource).to be_updated_by_last_action
@@ -130,7 +130,7 @@ describe Chef::Resource::Execute do
 
     it "guard overwrites value with its :environment and does not runs" do
       resource.only_if %{ruby -e 'exit 1 if ENV["SAWS_SECRET"] == "regularsecret"'}, {
-        :environment => { "SAWS_SECRET" => "regularsecret" },
+        environment: { "SAWS_SECRET" => "regularsecret" },
       }
       resource.run_action(:run)
       expect(resource).not_to be_updated_by_last_action

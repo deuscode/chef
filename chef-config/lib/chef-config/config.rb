@@ -4,7 +4,7 @@
 # Author:: AJ Christensen (<aj@chef.io>)
 # Author:: Mark Mzyk (<mmzyk@chef.io>)
 # Author:: Kyle Goodwin (<kgoodwin@primerevenue.com>)
-# Copyright:: Copyright 2008-2017, Chef Software Inc.
+# Copyright:: Copyright 2008-2019, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,19 +19,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-require "mixlib/config"
-require "pathname"
+require "mixlib/config" unless defined?(Mixlib::Config)
+require "pathname" unless defined?(Pathname)
 
-require "chef-config/fips"
-require "chef-config/logger"
-require "chef-config/windows"
-require "chef-config/path_helper"
-require "chef-config/mixin/fuzzy_hostname_matcher"
+require_relative "fips"
+require_relative "logger"
+require_relative "windows"
+require_relative "path_helper"
+require_relative "mixin/fuzzy_hostname_matcher"
 
-require "mixlib/shellout"
-require "uri"
-require "addressable/uri"
-require "openssl"
+require "mixlib/shellout" unless defined?(Mixlib::ShellOut::DEFAULT_READ_TIMEOUT)
+require "uri" unless defined?(URI)
+require "addressable/uri" unless defined?(Addressable::URI)
+require "openssl" unless defined?(OpenSSL)
 require "yaml"
 
 module ChefConfig
@@ -52,6 +52,12 @@ module ChefConfig
       configuration.inspect
     end
 
+    # given a *nix style config path return the platform specific path
+    # to that same config file
+    # @example client.pem path on Windows
+    #   platform_specific_path("/etc/chef/client.pem") #=> "C:\\chef\\client.pem"
+    # @param path [String] The unix path to convert to a platform specific path
+    # @return [String] a platform specific path
     def self.platform_specific_path(path)
       path = PathHelper.cleanpath(path)
       if ChefConfig.windows?
@@ -66,6 +72,11 @@ module ChefConfig
       path
     end
 
+    # the drive where Chef is installed on a windows host. This is determined
+    # either by the drive containing the current file or by the SYSTEMDRIVE ENV
+    # variable
+    #
+    # @return [String] the drive letter
     def self.windows_installation_drive
       if ChefConfig.windows?
         drive = File.expand_path(__FILE__).split("/", 2)[0]
@@ -74,10 +85,13 @@ module ChefConfig
       end
     end
 
+    # @param name [String]
+    # @param file_path [String]
     def self.add_formatter(name, file_path = nil)
       formatters << [name, file_path]
     end
 
+    # @param logger [String]
     def self.add_event_logger(logger)
       event_handlers << logger
     end
@@ -89,6 +103,7 @@ module ChefConfig
           if option.empty? || !option.include?("=")
             raise UnparsableConfigOption, "Unparsable config option #{option.inspect}"
           end
+
           # Split including whitespace if someone does truly odd like
           # --config-option "foo = bar"
           key, value = option.split(/\s*=\s*/, 2)
@@ -108,25 +123,29 @@ module ChefConfig
       if config_file
         PathHelper.dirname(PathHelper.canonical_path(config_file, false))
       else
-        PathHelper.join(user_home, ".chef", "")
+        PathHelper.join(PathHelper.cleanpath(user_home), ".chef", "")
       end
     end
 
     default :formatters, []
 
+    # @param uri [String] the URI to validate
+    #
+    # @return [Boolean] is the URL valid
     def self.is_valid_url?(uri)
       url = uri.to_s.strip
-      /^http:\/\// =~ url || /^https:\/\// =~ url || /^chefzero:/ =~ url
+      %r{^http://} =~ url || %r{^https://} =~ url || /^chefzero:/ =~ url
     end
+
     # Override the config dispatch to set the value of multiple server options simultaneously
     #
-    # === Parameters
-    # url<String>:: String to be set for all of the chef-server-api URL's
+    # @param [String] url String to be set for all of the chef-server-api URL's
     #
     configurable(:chef_server_url).writes_value do |uri|
       unless is_valid_url? uri
-        raise ConfigurationError, "#{uri} is an invalid chef_server_url."
+        raise ConfigurationError, "#{uri} is an invalid chef_server_url. The URL must start with http://, https://, or chefzero://."
       end
+
       uri.to_s.strip
     end
 
@@ -143,7 +162,7 @@ module ChefConfig
     # etc.) work.
     default :chef_repo_path do
       if configuration[:cookbook_path]
-        if configuration[:cookbook_path].kind_of?(String)
+        if configuration[:cookbook_path].is_a?(String)
           File.expand_path("..", configuration[:cookbook_path])
         else
           configuration[:cookbook_path].map do |path|
@@ -173,8 +192,9 @@ module ChefConfig
       path
     end
 
+    # @param child_path [String]
     def self.derive_path_from_chef_repo_path(child_path)
-      if chef_repo_path.kind_of?(String)
+      if chef_repo_path.is_a?(String)
         PathHelper.join(chef_repo_path, child_path)
       else
         chef_repo_path.uniq.map { |path| PathHelper.join(path, child_path) }
@@ -249,7 +269,7 @@ module ChefConfig
     # Defaults to <chef_repo_path>/policies.
     default(:policy_path) { derive_path_from_chef_repo_path("policies") }
 
-    # Turn on "path sanity" by default. See also: http://wiki.opscode.com/display/chef/User+Environment+PATH+Sanity
+    # Turn on "path sanity" by default.
     default :enforce_path_sanity, false
 
     # Formatted Chef Client output is a beta feature, disabled by default:
@@ -275,15 +295,18 @@ module ChefConfig
         # the cache path.
         unless path_accessible?(primary_cache_path) || path_accessible?(primary_cache_root)
           secondary_cache_path = PathHelper.join(user_home, ".chef")
-          ChefConfig.logger.info("Unable to access cache at #{primary_cache_path}. Switching cache to #{secondary_cache_path}")
+          secondary_cache_path = target_mode? ? "#{secondary_cache_path}/#{target_mode.host}" : secondary_cache_path
+          ChefConfig.logger.trace("Unable to access cache at #{primary_cache_path}. Switching cache to #{secondary_cache_path}")
           secondary_cache_path
         else
-          primary_cache_path
+          target_mode? ? "#{primary_cache_path}/#{target_mode.host}" : primary_cache_path
         end
       end
     end
 
     # Returns true only if the path exists and is readable and writeable for the user.
+    #
+    # @param path [String]
     def self.path_accessible?(path)
       File.exists?(path) && File.readable?(path) && File.writable?(path)
     end
@@ -311,6 +334,7 @@ module ChefConfig
     default :umask, 0022
 
     # Valid log_levels are:
+    # * :trace
     # * :debug
     # * :info
     # * :warn
@@ -343,6 +367,11 @@ module ChefConfig
 
     default :http_retry_count, 5
     default :http_retry_delay, 5
+    # Whether or not to send the Authorization header again on http redirects.
+    # As per the plan in https://github.com/chef/chef/pull/7006, this will be
+    # False in Chef 14, True in Chef 15, and will be removed entirely in Chef 16.
+    default :http_disable_auth_on_redirect, true
+
     default :interval, nil
     default :once, nil
     default :json_attribs, nil
@@ -352,6 +381,11 @@ module ChefConfig
     default :diff_disabled,           false
     default :diff_filesize_threshold, 10000000
     default :diff_output_threshold,   1000000
+
+    # This is true for "local mode" which uses a chef-zero server listening on
+    # localhost one way or another.  This is true for both `chef-solo` (without
+    # the --legacy-mode flag) or `chef-client -z` methods of starting a client run.
+    #
     default :local_mode, false
 
     # Configures the mode of operation for ChefFS, which is applied to the
@@ -369,7 +403,7 @@ module ChefConfig
     default :repo_mode do
       if local_mode && !chef_zero.osc_compat
         "hosted_everything"
-      elsif chef_server_url =~ /\/+organizations\/.+/
+      elsif chef_server_url =~ %r{/+organizations/.+}
         "hosted_everything"
       else
         "everything"
@@ -404,12 +438,28 @@ module ChefConfig
       # * Chef 11 mode doesn't expose RBAC objects
       default :osc_compat, false
     end
+
+    # RFCxxx Target Mode support, value is the name of a remote device to Chef against
+    # --target exists as a shortcut to enabling target_mode and setting the host
+    configurable(:target)
+
+    config_context :target_mode do
+      config_strict_mode false # we don't want to have to add all train configuration keys here
+      default :enabled, false
+      default :protocol, "ssh"
+      # typical additional keys: host, user, password
+    end
+
+    def self.target_mode?
+      target_mode.enabled
+    end
+
     default :chef_server_url, "https://localhost:443"
 
     default(:chef_server_root) do
       # if the chef_server_url is a path to an organization, aka
       # 'some_url.../organizations/*' then remove the '/organization/*' by default
-      if configuration[:chef_server_url] =~ /\/organizations\/\S*$/
+      if configuration[:chef_server_url] =~ %r{/organizations/\S*$}
         configuration[:chef_server_url].split("/")[0..-3].join("/")
       elsif configuration[:chef_server_url] # default to whatever chef_server_url is
         configuration[:chef_server_url]
@@ -419,28 +469,38 @@ module ChefConfig
     end
 
     default :rest_timeout, 300
-    default :yum_timeout, 900
-    default :yum_lock_timeout, 30
+
+    # This solo setting is now almost entirely useless.  It is set to true if chef-solo was
+    # invoked that way from the command-line (i.e. from Application::Solo as opposed to
+    # Application::Client).  The more useful information is contained in the :solo_legacy_mode
+    # vs the :local_mode flags which will be set to true or false depending on how solo was
+    # invoked and actually change more of the behavior.  There might be slight differences in
+    # the behavior of :local_mode due to the behavioral differences in Application::Solo vs.
+    # Application::Client and `chef-solo` vs `chef-client -z`, but checking this value and
+    # switching based on it is almost certainly doing the wrong thing and papering over
+    # bugs that should be fixed in one or the other class, and will be brittle and destined
+    # to break in the future (and not necessarily on a major version bump). Checking this value
+    # is also not sufficent to determine if we are not running against a server since this can
+    # be unset but :local_mode may be set.  It would be accurate to check both :solo and :local_mode
+    # to determine if we're not running against a server, but the more semantically accurate test
+    # is going to be combining :solo_legacy_mode and :local_mode.
+    #
+    # TL;DR: `if Chef::Config[:solo]` is almost certainly buggy code, you should use:
+    #        `if Chef::Config[:local_mode] || Chef::Config[:solo_legacy_mode]`
+    #
+    # @api private
     default :solo, false
 
-    # Are we running in old Chef Solo legacy mode?
+    # This is true for old chef-solo legacy mode without any chef-zero server (chef-solo --legacy-mode)
     default :solo_legacy_mode, false
 
     default :splay, nil
     default :why_run, false
     default :color, false
-    default :client_fork, true
+    default :client_fork, nil
     default :ez, false
     default :enable_reporting, true
     default :enable_reporting_url_fatals, false
-    # Possible values for :audit_mode
-    # :enabled, :disabled, :audit_only,
-    #
-    # TODO: 11 Dec 2014: Currently audit-mode is an experimental feature
-    # and is disabled by default. When users choose to enable audit-mode,
-    # a warning is issued in application/client#reconfigure.
-    # This can be removed when audit-mode is enabled by default.
-    default :audit_mode, :disabled
 
     # Chef only needs ohai to run the hostname plugin for the most basic
     # functionality. If the rest of the ohai plugins are not needed (like in
@@ -473,12 +533,6 @@ module ChefConfig
     # but it could be set in client.rb if desired.
 
     default :named_run_list, nil
-
-    # During initial development, users were required to set `use_policyfile true`
-    # in `client.rb` to opt-in to policyfile use. Chef Client now examines
-    # configuration, node json, and the stored node to determine if policyfile
-    # usage is desired. This flag is still honored if set, but is unnecessary.
-    default :use_policyfile, false
 
     # Policyfiles can be used in a native mode (default) or compatibility mode.
     # Native mode requires Chef Server 12.1 (it can be enabled via feature flag
@@ -575,7 +629,7 @@ module ChefConfig
     # the 'mixlib-authorization' project for more detail). Currently, versions
     # 1.0, 1.1, and 1.3 are available.
     default :authentication_protocol_version do
-      if fips
+      if fips || ssh_agent_signing
         "1.3"
       else
         "1.1"
@@ -590,7 +644,21 @@ module ChefConfig
     # `node_name` of the client.
     #
     # If chef-zero is enabled, this defaults to nil (no authentication).
-    default(:client_key) { chef_zero.enabled ? nil : platform_specific_path("/etc/chef/client.pem") }
+    default(:client_key) do
+      if chef_zero.enabled
+        nil
+      elsif target_mode?
+        platform_specific_path("/etc/chef/#{target_mode.host}/client.pem")
+      else
+        platform_specific_path("/etc/chef/client.pem")
+      end
+    end
+
+    # A credentials file may contain a complete client key, rather than the path
+    # to one.
+    #
+    # We'll use this preferentially.
+    default :client_key_contents, nil
 
     # When registering the client, should we allow the client key location to
     # be a symlink?  eg: /etc/chef/client.pem -> /etc/chef/prod-client.pem
@@ -598,9 +666,15 @@ module ChefConfig
     # never be set to true or its possibly an easily exploitable security hole.
     default :follow_client_key_symlink, false
 
+    # Enable ssh-agent signing mode. This requires {client_key} be set to a
+    # public key rather than the usual private key.
+    default :ssh_agent_signing, false
+
     # This secret is used to decrypt encrypted data bag items.
     default(:encrypted_data_bag_secret) do
-      if File.exist?(platform_specific_path("/etc/chef/encrypted_data_bag_secret"))
+      if target_mode? && File.exist?(platform_specific_path("/etc/chef/#{target_mode.host}/encrypted_data_bag_secret"))
+        platform_specific_path("/etc/chef/#{target_mode.host}/encrypted_data_bag_secret")
+      elsif File.exist?(platform_specific_path("/etc/chef/encrypted_data_bag_secret"))
         platform_specific_path("/etc/chef/encrypted_data_bag_secret")
       else
         nil
@@ -629,8 +703,17 @@ module ChefConfig
     #
     # If chef-zero is enabled, this defaults to nil (no authentication).
     default(:validation_key) { chef_zero.enabled ? nil : platform_specific_path("/etc/chef/validation.pem") }
-    default :validation_client_name, "chef-validator"
+    default :validation_client_name do
+      # If the URL is set and looks like a normal Chef Server URL, extract the
+      # org name and use that as part of the default.
+      if chef_server_url.to_s =~ %r{/organizations/(.*)$}
+        "#{$1}-validator"
+      else
+        "chef-validator"
+      end
+    end
 
+    default :validation_key_contents, nil
     # When creating a new client via the validation_client account, Chef 11
     # servers allow the client to generate a key pair locally and send the
     # public key to the server. This is more secure and helps offload work from
@@ -670,7 +753,7 @@ module ChefConfig
 
     # Deprecated:
     # Move this to the default value of syntax_cache_path when this is removed.
-    default(:cache_options) { { :path => PathHelper.join(config_dir, "syntaxcache") } }
+    default(:cache_options) { { path: PathHelper.join(config_dir, "syntaxcache") } }
 
     # Whether errors should be raised for deprecation warnings. When set to
     # `false` (the default setting), a warning is emitted but code using
@@ -687,9 +770,23 @@ module ChefConfig
       ENV.key?("CHEF_TREAT_DEPRECATION_WARNINGS_AS_ERRORS")
     end
 
+    # Which deprecations warnings to silence. Can be set to `true` to silence
+    # all warnings, or an array of strings like either `"deprecation_type"` or
+    # `"filename.rb:lineno"`.
+    default :silence_deprecation_warnings, []
+
     # Whether the resource count should be updated for log resource
     # on running chef-client
     default :count_log_resource_updates, true
+
+    # The selected profile when using credentials.
+    default :profile, nil
+
+    default :chef_guid_path do
+      PathHelper.join(config_dir, "chef_guid")
+    end
+
+    default :chef_guid, nil
 
     # knife configuration data
     config_context :knife do
@@ -717,7 +814,6 @@ module ChefConfig
       default :bootstrap_template, nil
       default :secret, nil
       default :secret_file, nil
-      default :identity_file, nil
       default :host_key_verify, nil
       default :forward_agent, nil
       default :sort_status_reverse, nil
@@ -779,6 +875,7 @@ module ChefConfig
     #
     # NOTE: CHANGING THIS SETTING MAY CAUSE CORRUPTION, DATA LOSS AND
     # INSTABILITY.
+    #
     default :file_atomic_update, true
 
     # There are 3 possible values for this configuration setting.
@@ -786,18 +883,27 @@ module ChefConfig
     # false => file staging is done via tempfiles under ENV['TMP']
     # :auto => file staging will try using destination directory if possible and
     #   will fall back to ENV['TMP'] if destination directory is not usable.
+    #
     default :file_staging_uses_destdir, :auto
 
     # Exit if another run is in progress and the chef-client is unable to
     # get the lock before time expires. If nil, no timeout is enforced. (Exits
     # immediately if 0.)
+    #
     default :run_lock_timeout, nil
 
     # Number of worker threads for syncing cookbooks in parallel. Increasing
     # this number can result in gateway errors from the server (namely 503 and 504).
     # If you are seeing this behavior while using the default setting, reducing
     # the number of threads will help.
+    #
     default :cookbook_sync_threads, 10
+
+    # True if all resources by default default to unified mode, with all resources
+    # applying in "compile" mode, with no "converge" mode. False is backwards compatible
+    # setting for Chef 11-15 behavior.  This will break forward notifications.
+    #
+    default :resource_unified_mode_default, false
 
     # At the beginning of the Chef Client run, the cookbook manifests are downloaded which
     # contain URLs for every file in every relevant cookbook.  Most of the files
@@ -824,9 +930,9 @@ module ChefConfig
     default :no_lazy_load, true
 
     # A whitelisted array of attributes you want sent over the wire when node
-    # data is saved.
-    # The default setting is nil, which collects all data. Setting to [] will not
-    # collect any data for save.
+    # data is saved. The default setting is nil, which collects all data. Setting
+    # to [] will not collect any data for save.
+    #
     default :automatic_attribute_whitelist, nil
     default :default_attribute_whitelist, nil
     default :normal_attribute_whitelist, nil
@@ -869,7 +975,7 @@ module ChefConfig
       # data collector will not run.
       # Ex: http://my-data-collector.mycompany.com/ingest
       default(:server_url) do
-        if config_parent.solo || config_parent.local_mode
+        if config_parent.solo_legacy_mode || config_parent.local_mode
           nil
         else
           File.join(config_parent.chef_server_url, "/data-collector")
@@ -900,7 +1006,7 @@ module ChefConfig
       # generated by the DataCollector when Chef is run in Solo mode. This
       # allows users to associate their Solo nodes with faux organizations
       # without the nodes being connected to an actual Chef Server.
-      default :organization, nil
+      default :organization, "chef_solo"
     end
 
     configurable(:http_proxy)
@@ -920,10 +1026,10 @@ module ChefConfig
     # TODO add some post-file-parsing logic that automatically calls this so
     # users don't have to
     def self.export_proxies
-      export_proxy("http", http_proxy, http_proxy_user, http_proxy_pass) if http_proxy
-      export_proxy("https", https_proxy, https_proxy_user, https_proxy_pass) if https_proxy
-      export_proxy("ftp", ftp_proxy, ftp_proxy_user, ftp_proxy_pass) if ftp_proxy
-      export_no_proxy(no_proxy) if no_proxy
+      export_proxy("http", http_proxy, http_proxy_user, http_proxy_pass) if key?(:http_proxy) && http_proxy
+      export_proxy("https", https_proxy, https_proxy_user, https_proxy_pass) if key?(:https_proxy) && https_proxy
+      export_proxy("ftp", ftp_proxy, ftp_proxy_user, ftp_proxy_pass) if key?(:ftp_proxy) && ftp_proxy
+      export_no_proxy(no_proxy) if key?(:no_proxy) && no_proxy
     end
 
     # Character classes for Addressable
@@ -977,8 +1083,8 @@ module ChefConfig
       # Check if the proxy string contains a scheme. If not, add the url's scheme to the
       # proxy before parsing. The regex /^.*:\/\// matches, for example, http://. Reusing proxy
       # here since we are really just trying to get the string built correctly.
-      proxy = if !proxy_env_var.empty?
-                if proxy_env_var =~ /^.*:\/\//
+      proxy = unless proxy_env_var.empty?
+                if proxy_env_var =~ %r{^.*://}
                   URI.parse(proxy_env_var)
                 else
                   URI.parse("#{scheme}://#{proxy_env_var}")
@@ -1033,9 +1139,9 @@ module ChefConfig
       end
     rescue
       if ChefConfig.windows?
-        ChefConfig.logger.debug "Defaulting to locale en_US.UTF-8 on Windows, until it matters that we do something else."
+        ChefConfig.logger.trace "Defaulting to locale en_US.UTF-8 on Windows, until it matters that we do something else."
       else
-        ChefConfig.logger.debug "No usable locale -a command found, assuming you have en_US.UTF-8 installed."
+        ChefConfig.logger.trace "No usable locale -a command found, assuming you have en_US.UTF-8 installed."
       end
       "en_US.UTF-8"
     end
@@ -1053,6 +1159,9 @@ module ChefConfig
 
     # can be set to a string or array of strings for URIs to set as rubygems sources
     default :rubygems_url, "https://www.rubygems.org"
+
+    # globally sets the default of the clear_sources property on the gem_package and chef_gem resources
+    default :clear_gem_sources, false
 
     # If installed via an omnibus installer, this gives the path to the
     # "embedded" directory which contains all of the software packaged with

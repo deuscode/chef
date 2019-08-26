@@ -5,7 +5,11 @@ module ChefNetHTTPExceptionExtensions
   attr_accessor :chef_rest_request
 end
 
-require "net/http"
+unless defined?(Net::HTTPClientException)
+  Net::HTTPClientException = Net::HTTPServerException
+end
+
+require "net/http" unless defined?(Net::HTTP)
 module Net
   class HTTPError
     include ChefNetHTTPExceptionExtensions
@@ -13,7 +17,7 @@ module Net
   class HTTPRetriableError
     include ChefNetHTTPExceptionExtensions
   end
-  class HTTPServerException
+  class HTTPClientException
     include ChefNetHTTPExceptionExtensions
   end
   class HTTPFatalError
@@ -21,7 +25,7 @@ module Net
   end
 end
 
-if Net::HTTP.instance_methods.map { |m| m.to_s }.include?("proxy_uri")
+if Net::HTTP.instance_methods.map(&:to_s).include?("proxy_uri")
   begin
     # Ruby 2.0 changes the way proxy support is implemented in Net::HTTP.
     # The implementation does not work correctly with IPv6 literals because it
@@ -33,13 +37,13 @@ if Net::HTTP.instance_methods.map { |m| m.to_s }.include?("proxy_uri")
     #
     #    ruby -r'net/http' -e 'Net::HTTP.new("::1", 80).proxy_uri'
     #    /Users/ddeleo/.rbenv/versions/2.0.0-p247/lib/ruby/2.0.0/uri/generic.rb:214:in `initialize': the scheme http does not accept registry part: ::1:80 (or bad hostname?) (URI::InvalidURIError)
-    #    	from /Users/ddeleo/.rbenv/versions/2.0.0-p247/lib/ruby/2.0.0/uri/http.rb:84:in `initialize'
-    #    	from /Users/ddeleo/.rbenv/versions/2.0.0-p247/lib/ruby/2.0.0/uri/common.rb:214:in `new'
-    #    	from /Users/ddeleo/.rbenv/versions/2.0.0-p247/lib/ruby/2.0.0/uri/common.rb:214:in `parse'
-    #    	from /Users/ddeleo/.rbenv/versions/2.0.0-p247/lib/ruby/2.0.0/uri/common.rb:747:in `parse'
-    #    	from /Users/ddeleo/.rbenv/versions/2.0.0-p247/lib/ruby/2.0.0/uri/common.rb:994:in `URI'
-    #    	from /Users/ddeleo/.rbenv/versions/2.0.0-p247/lib/ruby/2.0.0/net/http.rb:1027:in `proxy_uri'
-    #    	from -e:1:in `<main>'
+    #      from /Users/ddeleo/.rbenv/versions/2.0.0-p247/lib/ruby/2.0.0/uri/http.rb:84:in `initialize'
+    #      from /Users/ddeleo/.rbenv/versions/2.0.0-p247/lib/ruby/2.0.0/uri/common.rb:214:in `new'
+    #      from /Users/ddeleo/.rbenv/versions/2.0.0-p247/lib/ruby/2.0.0/uri/common.rb:214:in `parse'
+    #      from /Users/ddeleo/.rbenv/versions/2.0.0-p247/lib/ruby/2.0.0/uri/common.rb:747:in `parse'
+    #      from /Users/ddeleo/.rbenv/versions/2.0.0-p247/lib/ruby/2.0.0/uri/common.rb:994:in `URI'
+    #      from /Users/ddeleo/.rbenv/versions/2.0.0-p247/lib/ruby/2.0.0/net/http.rb:1027:in `proxy_uri'
+    #      from -e:1:in `<main>'
     #
     # https://bugs.ruby-lang.org/issues/9129
     #

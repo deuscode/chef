@@ -16,23 +16,22 @@
 # limitations under the License.
 #
 
-require "chef/knife"
+require_relative "../knife"
 
 class Chef
   class Knife
     class EnvironmentCreate < Knife
 
       deps do
-        require "chef/environment"
-        require "chef/json_compat"
+        require_relative "../environment"
       end
 
       banner "knife environment create ENVIRONMENT (options)"
 
       option :description,
-        :short => "-d DESCRIPTION",
-        :long => "--description DESCRIPTION",
-        :description => "The environment description"
+        short: "-d DESCRIPTION",
+        long: "--description DESCRIPTION",
+        description: "The environment description."
 
       def run
         env_name = @name_args[0]

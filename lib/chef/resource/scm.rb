@@ -16,162 +16,58 @@
 # limitations under the License.
 #
 
-require "chef/resource"
+require_relative "../resource"
 
 class Chef
   class Resource
     class Scm < Chef::Resource
-      identity_attr :destination
-
-      state_attrs :revision
-
       default_action :sync
       allowed_actions :checkout, :export, :sync, :diff, :log
 
-      def initialize(name, run_context = nil)
-        super
-        @destination = name
-        @enable_submodules = false
-        @enable_checkout = true
-        @revision = "HEAD"
-        @remote = "origin"
-        @ssh_wrapper = nil
-        @depth = nil
-        @checkout_branch = "deploy"
-        @environment = nil
-      end
+      property :destination, String,
+        description: "The location path to which the source is to be cloned, checked out, or exported. Default value: the name of the resource block.",
+        name_property: true, identity: true
 
-      def destination(arg = nil)
-        set_or_return(
-          :destination,
-          arg,
-          :kind_of => String
-        )
-      end
+      property :repository, String
 
-      def repository(arg = nil)
-        set_or_return(
-          :repository,
-          arg,
-          :kind_of => String
-        )
-      end
+      property :revision, String,
+        description: "The revision to checkout.",
+        default: "HEAD"
 
-      def revision(arg = nil)
-        set_or_return(
-          :revision,
-          arg,
-          :kind_of => String
-        )
-      end
+      property :user, [String, Integer],
+        description: "The system user that is responsible for the checked-out code."
 
-      def user(arg = nil)
-        set_or_return(
-          :user,
-          arg,
-          :kind_of => [String, Integer]
-        )
-      end
-
-      def group(arg = nil)
-        set_or_return(
-          :group,
-          arg,
-          :kind_of => [String, Integer]
-        )
-      end
-
-      def svn_username(arg = nil)
-        set_or_return(
-          :svn_username,
-          arg,
-          :kind_of => String
-        )
-      end
-
-      property :svn_password, String, sensitive: true, desired_state: false
-
-      def svn_arguments(arg = nil)
-        @svn_arguments, arg = nil, nil if arg == false
-        set_or_return(
-          :svn_arguments,
-          arg,
-          :kind_of => String
-        )
-      end
-
-      def svn_info_args(arg = nil)
-        @svn_info_args, arg = nil, nil if arg == false
-        set_or_return(
-          :svn_info_args,
-          arg,
-          :kind_of => String)
-      end
+      property :group, [String, Integer],
+        description: "The system group that is responsible for the checked-out code."
 
       # Capistrano and git-deploy use ``shallow clone''
-      def depth(arg = nil)
-        set_or_return(
-          :depth,
-          arg,
-          :kind_of => Integer
-        )
-      end
+      property :depth, Integer,
+        description: "The number of past revisions to be included in the git shallow clone. Unless specified the default behavior will do a full clone."
 
-      def enable_submodules(arg = nil)
-        set_or_return(
-          :enable_submodules,
-          arg,
-          :kind_of => [TrueClass, FalseClass]
-        )
-      end
+      property :enable_submodules, [TrueClass, FalseClass],
+        description: "Perform a sub-module initialization and update.",
+        default: false
 
-      def enable_checkout(arg = nil)
-        set_or_return(
-          :enable_checkout,
-          arg,
-          :kind_of => [TrueClass, FalseClass]
-        )
-      end
+      property :enable_checkout, [TrueClass, FalseClass],
+        description: "Check out a repo from master. Set to false when using the checkout_branch attribute to prevent the git resource from attempting to check out master from master.",
+        default: true
 
-      def remote(arg = nil)
-        set_or_return(
-          :remote,
-          arg,
-          :kind_of => String
-        )
-      end
+      property :remote, String,
+        default: "origin"
 
-      def ssh_wrapper(arg = nil)
-        set_or_return(
-          :ssh_wrapper,
-          arg,
-          :kind_of => String
-        )
-      end
+      property :ssh_wrapper, String,
+        desired_state: false
 
-      def timeout(arg = nil)
-        set_or_return(
-          :timeout,
-          arg,
-          :kind_of => Integer
-        )
-      end
+      property :timeout, Integer,
+        desired_state: false
 
-      def checkout_branch(arg = nil)
-        set_or_return(
-          :checkout_branch,
-          arg,
-          :kind_of => String
-        )
-      end
+      property :checkout_branch, String,
+        description: "Do a one-time checkout **or** use when a branch in the upstream repository is named 'deploy'. To prevent the resource from attempting to check out master from master, set 'enable_checkout' to 'false' when using the 'checkout_branch' property.",
+        default: "deploy"
 
-      def environment(arg = nil)
-        set_or_return(
-          :environment,
-          arg,
-          :kind_of => [ Hash ]
-        )
-      end
+      property :environment, [Hash, nil],
+        description: "A Hash of environment variables in the form of ({'ENV_VARIABLE' => 'VALUE'}).",
+        default: nil
 
       alias :env :environment
     end

@@ -16,7 +16,7 @@
 # limitations under the License.
 #
 
-require "chef/knife"
+require_relative "../knife"
 
 class Chef
   class Knife
@@ -25,8 +25,7 @@ class Chef
       include Knife::Core::MultiAttributeReturnOption
 
       deps do
-        require "chef/node"
-        require "chef/json_compat"
+        require_relative "../role"
       end
 
       banner "knife role show ROLE (options)"
@@ -36,7 +35,7 @@ class Chef
 
         if @role_name.nil?
           show_usage
-          ui.fatal("You must specify a role name")
+          ui.fatal("You must specify a role name.")
           exit 1
         end
 

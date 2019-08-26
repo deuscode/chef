@@ -16,7 +16,7 @@
 # limitations under the License.
 #
 
-require "chef/formatters/error_inspectors/api_error_formatting"
+require_relative "api_error_formatting"
 
 class Chef
   module Formatters
@@ -41,7 +41,7 @@ class Chef
 
         def add_explanation(error_description)
           case exception
-          when Net::HTTPServerException, Net::HTTPFatalError
+          when Net::HTTPClientException, Net::HTTPFatalError
             humanize_http_exception(error_description)
           when EOFError
             describe_eof_error(error_description)

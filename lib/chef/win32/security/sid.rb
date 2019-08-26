@@ -16,9 +16,9 @@
 # limitations under the License.
 #
 
-require "chef/win32/security"
-require "chef/win32/api/net"
-require "chef/win32/api/error"
+require_relative "../security"
+require_relative "../api/net"
+require_relative "../api/error"
 
 require "wmi-lite/wmi"
 
@@ -231,25 +231,63 @@ class Chef
         end
 
         def self.None
-          SID.from_account("#{::ENV['COMPUTERNAME']}\\None")
+          SID.from_account("#{::ENV["COMPUTERNAME"]}\\None")
         end
 
         def self.Administrator
-          SID.from_account("#{::ENV['COMPUTERNAME']}\\#{SID.admin_account_name}")
+          SID.from_account("#{::ENV["COMPUTERNAME"]}\\#{SID.admin_account_name}")
         end
 
         def self.Guest
-          SID.from_account("#{::ENV['COMPUTERNAME']}\\Guest")
+          SID.from_account("#{::ENV["COMPUTERNAME"]}\\Guest")
         end
 
         def self.current_user
-          SID.from_account("#{::ENV['USERDOMAIN']}\\#{::ENV['USERNAME']}")
+          SID.from_account("#{::ENV["USERDOMAIN"]}\\#{::ENV["USERNAME"]}")
+        end
+
+        SERVICE_ACCOUNT_USERS = [self.LocalSystem,
+                                 self.NtLocal,
+                                 self.NtNetwork].flat_map do |user_type|
+                                   [user_type.account_simple_name.upcase,
+                                    user_type.account_name.upcase]
+                                 end.freeze
+
+        BUILT_IN_GROUPS = [self.BuiltinAdministrators,
+                           self.BuiltinUsers, self.Guests].flat_map do |user_type|
+                             [user_type.account_simple_name.upcase,
+                              user_type.account_name.upcase]
+                           end.freeze
+
+        SYSTEM_USER = SERVICE_ACCOUNT_USERS + BUILT_IN_GROUPS
+
+        # Сheck if the user belongs to service accounts category
+        #
+        # @return [Boolean] True or False
+        #
+        def self.service_account_user?(user)
+          SERVICE_ACCOUNT_USERS.include?(user.to_s.upcase)
+        end
+
+        # Сheck if the user is in builtin system group
+        #
+        # @return [Boolean] True or False
+        #
+        def self.group_user?(user)
+          BUILT_IN_GROUPS.include?(user.to_s.upcase)
+        end
+
+        # Сheck if the user belongs to system users category
+        #
+        # @return [Boolean] True or False
+        #
+        def self.system_user?(user)
+          SYSTEM_USER.include?(user.to_s.upcase)
         end
 
         # See https://technet.microsoft.com/en-us/library/cc961992.aspx
         # In practice, this is SID.Administrators if the current_user is an admin (even if not
-        # running elevated), and is current_user otherwise. On win2k3, it technically can be
-        # current_user in all cases if a certain group policy is set.
+        # running elevated), and is current_user otherwise.
         def self.default_security_object_owner
           token = Chef::ReservedNames::Win32::Security.open_current_process_token
           Chef::ReservedNames::Win32::Security.get_token_information_owner(token)
@@ -300,6 +338,7 @@ class Chef
             end
 
             raise "Can not determine the administrator account name." if admin_account_name.nil?
+
             admin_account_name
           end
         end

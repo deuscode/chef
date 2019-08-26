@@ -23,11 +23,11 @@ describe Chef::Knife::RoleCreate do
     Chef::Config[:node_name] = "webmonkey.example.com"
     @knife = Chef::Knife::RoleCreate.new
     @knife.config = {
-      :description => nil,
+      description: nil,
     }
     @knife.name_args = [ "adam" ]
     allow(@knife).to receive(:output).and_return(true)
-    @role = Chef::Role.new()
+    @role = Chef::Role.new
     allow(@role).to receive(:save)
     allow(Chef::Role).to receive(:new).and_return(@role)
     allow(@knife).to receive(:edit_data).and_return(@role)

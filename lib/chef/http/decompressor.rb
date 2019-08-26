@@ -17,7 +17,7 @@
 #
 
 require "zlib"
-require "chef/http/http_request"
+require_relative "http_request"
 
 class Chef
   class HTTP
@@ -64,6 +64,7 @@ class Chef
         # temporary hack, skip processing if return_value is false
         # needed to keep conditional get stuff working correctly.
         return [http_response, rest_request, return_value] if return_value == false
+
         response_body = decompress_body(http_response)
         http_response.body.replace(response_body) if http_response.body.respond_to?(:replace)
         [http_response, rest_request, return_value]
@@ -79,10 +80,10 @@ class Chef
         else
           case response[CONTENT_ENCODING]
           when GZIP
-            Chef::Log.debug "Decompressing gzip response"
+            Chef::Log.trace "Decompressing gzip response"
             Zlib::Inflate.new(Zlib::MAX_WBITS + 16).inflate(response.body)
           when DEFLATE
-            Chef::Log.debug "Decompressing deflate response"
+            Chef::Log.trace "Decompressing deflate response"
             Zlib::Inflate.inflate(response.body)
           else
             response.body
@@ -94,20 +95,20 @@ class Chef
       # object you can use to unzip/inflate a streaming response.
       def stream_response_handler(response)
         if gzip_disabled?
-          Chef::Log.debug "disable_gzip is set. \
+          Chef::Log.trace "disable_gzip is set. \
             Not using #{response[CONTENT_ENCODING]} \
             and initializing noop stream deflator."
           NoopInflater.new
         else
           case response[CONTENT_ENCODING]
           when GZIP
-            Chef::Log.debug "Initializing gzip stream deflator"
+            Chef::Log.trace "Initializing gzip stream deflator"
             GzipInflater.new
           when DEFLATE
-            Chef::Log.debug "Initializing deflate stream deflator"
+            Chef::Log.trace "Initializing deflate stream deflator"
             DeflateInflater.new
           else
-            Chef::Log.debug "content_encoding = '#{response[CONTENT_ENCODING]}' \
+            Chef::Log.trace "content_encoding = '#{response[CONTENT_ENCODING]}' \
               initializing noop stream deflator."
             NoopInflater.new
           end

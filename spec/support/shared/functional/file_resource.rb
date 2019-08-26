@@ -1,6 +1,6 @@
 #
 # Author:: Seth Chisamore (<schisamo@chef.io>)
-# Copyright:: Copyright 2011-2016, Chef Software Inc.
+# Copyright:: Copyright 2011-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -385,21 +385,19 @@ shared_examples_for "a configured file resource" do
   def selinux_security_context_restored?(path)
     @restorecon_path = which("restorecon") if @restorecon_path.nil?
     restorecon_test_command = "#{@restorecon_path} -n -v #{path}"
-    cmdresult = shell_out(restorecon_test_command)
+    cmdresult = shell_out!(restorecon_test_command)
     # restorecon will print the required changes to stdout if any is
     # needed
     cmdresult.stdout.empty?
   end
 
   def binread(file)
-    content = File.open(file, "rb") do |f|
-      f.read
-    end
+    content = File.open(file, "rb", &:read)
     content.force_encoding(Encoding::BINARY) if "".respond_to?(:force_encoding)
     content
   end
 
-  context "when the target file is a symlink", :not_supported_on_win2k3 do
+  context "when the target file is a symlink" do
     let(:symlink_target) do
       File.join(CHEF_SPEC_DATA, "file-test-target")
     end
@@ -725,7 +723,7 @@ shared_examples_for "a configured file resource" do
     end
 
     before(:each) do
-      result = shell_out("mknod #{path} b 1 2")
+      result = shell_out!("mknod #{path} b 1 2")
       result.stderr.empty?
     end
 
@@ -743,7 +741,7 @@ shared_examples_for "a configured file resource" do
     end
 
     before(:each) do
-      result = shell_out("mknod #{path} c 1 2")
+      result = shell_out!("mknod #{path} c 1 2")
       result.stderr.empty?
     end
 
@@ -761,7 +759,7 @@ shared_examples_for "a configured file resource" do
     end
 
     before(:each) do
-      result = shell_out("mkfifo #{path}")
+      result = shell_out!("mkfifo #{path}")
       result.stderr.empty?
     end
 
@@ -899,11 +897,11 @@ shared_examples_for "a configured file resource" do
   end
 
   # Set up the context for security tests
-  def allowed_acl(sid, expected_perms)
+  def allowed_acl(sid, expected_perms, _flags = 0)
     [ ACE.access_allowed(sid, expected_perms[:specific]) ]
   end
 
-  def denied_acl(sid, expected_perms)
+  def denied_acl(sid, expected_perms, _flags = 0)
     [ ACE.access_denied(sid, expected_perms[:specific]) ]
   end
 

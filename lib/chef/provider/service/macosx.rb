@@ -16,19 +16,19 @@
 # limitations under the License.
 #
 
-require "etc"
-require "rexml/document"
-require "chef/resource/service"
-require "chef/resource/macosx_service"
-require "chef/provider/service/simple"
-require "chef/util/path_helper"
+require "etc" unless defined?(Etc)
+require "rexml/document" unless defined?(REXML::Document)
+require_relative "../../resource/service"
+require_relative "../../resource/macosx_service"
+require_relative "simple"
+require_relative "../../util/path_helper"
 
 class Chef
   class Provider
     class Service
       class Macosx < Chef::Provider::Service::Simple
 
-        provides :macosx_service, os: "darwin"
+        provides :macosx_service
         provides :service, os: "darwin"
 
         def self.gather_plist_dirs
@@ -52,21 +52,22 @@ class Chef
           @plist_size = 0
           @plist = @new_resource.plist ? @new_resource.plist : find_service_plist
           @service_label = find_service_label
-          # LauchAgents should be loaded as the console user.
+          # LaunchAgents should be loaded as the console user.
           @console_user = @plist ? @plist.include?("LaunchAgents") : false
           @session_type = @new_resource.session_type
 
           if @console_user
-            @console_user = Etc.getlogin
-            Chef::Log.debug("#{new_resource} console_user: '#{@console_user}'")
+            @console_user = Etc.getpwuid(::File.stat("/dev/console").uid).name
+            logger.trace("#{new_resource} console_user: '#{@console_user}'")
             cmd = "su "
             param = this_version_or_newer?("10.10") ? "" : "-l "
+            param = "-l " if this_version_or_newer?("10.12")
             @base_user_cmd = cmd + param + "#{@console_user} -c"
-            # Default LauchAgent session should be Aqua
+            # Default LaunchAgent session should be Aqua
             @session_type = "Aqua" if @session_type.nil?
           end
 
-          Chef::Log.debug("#{new_resource} Plist: '#{@plist}' service_label: '#{@service_label}'")
+          logger.trace("#{new_resource} Plist: '#{@plist}' service_label: '#{@service_label}'")
           set_service_status
 
           @current_resource
@@ -107,7 +108,7 @@ class Chef
 
         def start_service
           if @current_resource.running
-            Chef::Log.debug("#{@new_resource} already running, not starting")
+            logger.trace("#{@new_resource} already running, not starting")
           else
             if @new_resource.start_command
               super
@@ -119,7 +120,7 @@ class Chef
 
         def stop_service
           unless @current_resource.running
-            Chef::Log.debug("#{@new_resource} not running, not stopping")
+            logger.trace("#{@new_resource} not running, not stopping")
           else
             if @new_resource.stop_command
               super
@@ -146,7 +147,7 @@ class Chef
         # supervisor that will restart daemons that are crashing, etc.
         def enable_service
           if @current_resource.enabled
-            Chef::Log.debug("#{@new_resource} already enabled, not enabling")
+            logger.trace("#{@new_resource} already enabled, not enabling")
           else
             load_service
           end
@@ -154,7 +155,7 @@ class Chef
 
         def disable_service
           unless @current_resource.enabled
-            Chef::Log.debug("#{@new_resource} not enabled, not disabling")
+            logger.trace("#{@new_resource} not enabled, not disabling")
           else
             unload_service
           end
@@ -173,9 +174,9 @@ class Chef
 
         def shell_out_as_user(cmd)
           if @console_user
-            shell_out_with_systems_locale("#{@base_user_cmd} '#{cmd}'")
+            shell_out("#{@base_user_cmd} '#{cmd}'", default_env: false)
           else
-            shell_out_with_systems_locale(cmd)
+            shell_out(cmd, default_env: false)
 
           end
         end
@@ -198,7 +199,7 @@ class Chef
               when /\s+\"pid\"\s+=\s+(\d+).*/
                 pid = $1
                 @current_resource.running(pid.to_i != 0)
-                Chef::Log.debug("Current PID for #{@service_label} is #{pid}")
+                logger.trace("Current PID for #{@service_label} is #{pid}")
               end
             end
           else
@@ -223,8 +224,9 @@ class Chef
 
           # plist files can come in XML or Binary formats. this command
           # will make sure we get XML every time.
-          plist_xml = shell_out_with_systems_locale!(
-            "plutil -convert xml1 -o - #{@plist}"
+          plist_xml = shell_out!(
+            "plutil -convert xml1 -o - #{@plist}",
+            default_env: false
           ).stdout
 
           plist_doc = REXML::Document.new(plist_xml)

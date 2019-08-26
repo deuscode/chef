@@ -22,7 +22,7 @@ require "spec_helper"
 shared_examples_for "an execute resource" do
 
   before(:each) do
-    @resource = execute_resource
+    @resource = resource
   end
 
   it "should create a new Chef::Resource::Execute" do
@@ -57,7 +57,7 @@ shared_examples_for "an execute resource" do
   end
 
   it "should accept a hash for the environment" do
-    test_hash = { :one => :two }
+    test_hash = { one: :two }
     @resource.environment(test_hash)
     expect(@resource.environment).to eql(test_hash)
   end
@@ -139,7 +139,14 @@ shared_examples_for "an execute resource" do
     it "should be true if the password is non-nil but the value is explicitly set to false" do
       @resource.password("we.funk!")
       @resource.sensitive false
-      expect(@resource.sensitive).to eq(true)
+      expect(@resource.sensitive).to eq(false)
+    end
+
+    # added this test to ensure setting of password property after or before sensitive does not matter
+    it "should be false if the sensitive is set before password property" do
+      @resource.sensitive false
+      @resource.password("we.funk!")
+      expect(@resource.sensitive).to eq(false)
     end
 
   end
@@ -148,7 +155,7 @@ shared_examples_for "an execute resource" do
     before do
       @resource.command("grep")
       @resource.cwd("/tmp/")
-      @resource.environment({ :one => :two })
+      @resource.environment({ one: :two })
       @resource.group("legos")
       @resource.returns(1)
       @resource.user("root")

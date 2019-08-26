@@ -17,15 +17,15 @@
 # limitations under the License.
 #
 
-require "chef/config"
-require "chef/log"
-require "chef/resource/file"
-require "chef/mixin/checksum"
-require "chef/provider"
-require "etc"
-require "fileutils"
-require "chef/scan_access_control"
-require "chef/win32/registry"
+require_relative "../config"
+require_relative "../log"
+require_relative "../resource/file"
+require_relative "../mixin/checksum"
+require_relative "../provider"
+require "etc" unless defined?(Etc)
+require "fileutils" unless defined?(FileUtils)
+require_relative "../scan_access_control"
+require_relative "../win32/registry"
 
 class Chef
 
@@ -68,7 +68,7 @@ class Chef
 
       def key_missing?(values, name)
         values.each do |v|
-          return true unless v.has_key?(name)
+          return true unless v.key?(name)
         end
         false
       end
@@ -76,7 +76,7 @@ class Chef
       def define_resource_requirements
         requirements.assert(:create, :create_if_missing, :delete, :delete_key) do |a|
           a.assertion { registry.hive_exists?(new_resource.key) }
-          a.failure_message(Chef::Exceptions::Win32RegHiveMissing, "Hive #{new_resource.key.split("\\").shift} does not exist")
+          a.failure_message(Chef::Exceptions::Win32RegHiveMissing, "Hive #{new_resource.key.split('\\').shift} does not exist")
         end
 
         requirements.assert(:create) do |a|
@@ -120,18 +120,30 @@ class Chef
           end
         end
         new_resource.unscrubbed_values.each do |value|
-          if @name_hash.has_key?(value[:name].downcase)
+          if @name_hash.key?(value[:name].downcase)
             current_value = @name_hash[value[:name].downcase]
-            if [:dword, :dword_big_endian, :qword].include? value[:type]
+            if %i{dword dword_big_endian qword}.include? value[:type]
               value[:data] = value[:data].to_i
             end
             unless current_value[:type] == value[:type] && current_value[:data] == value[:data]
-              converge_by("set value #{value}") do
+              converge_by_value = if new_resource.sensitive
+                                    value.merge(data: "*sensitive value suppressed*")
+                                  else
+                                    value
+                                  end
+
+              converge_by("set value #{converge_by_value}") do
                 registry.set_value(new_resource.key, value)
               end
             end
           else
-            converge_by("set value #{value}") do
+            converge_by_value = if new_resource.sensitive
+                                  value.merge(data: "*sensitive value suppressed*")
+                                else
+                                  value
+                                end
+
+            converge_by("set value #{converge_by_value}") do
               registry.set_value(new_resource.key, value)
             end
           end
@@ -145,8 +157,14 @@ class Chef
           end
         end
         new_resource.unscrubbed_values.each do |value|
-          unless @name_hash.has_key?(value[:name].downcase)
-            converge_by("create value #{value}") do
+          unless @name_hash.key?(value[:name].downcase)
+            converge_by_value = if new_resource.sensitive
+                                  value.merge(data: "*sensitive value suppressed*")
+                                else
+                                  value
+                                end
+
+            converge_by("create value #{converge_by_value}") do
               registry.set_value(new_resource.key, value)
             end
           end
@@ -156,8 +174,11 @@ class Chef
       def action_delete
         if registry.key_exists?(new_resource.key)
           new_resource.unscrubbed_values.each do |value|
-            if @name_hash.has_key?(value[:name].downcase)
-              converge_by("delete value #{value}") do
+            if @name_hash.key?(value[:name].downcase)
+              converge_by_value = value
+              converge_by_value[:data] = "*sensitive value suppressed*" if new_resource.sensitive
+
+              converge_by("delete value #{converge_by_value}") do
                 registry.delete_value(new_resource.key, value)
               end
             end

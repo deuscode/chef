@@ -1,7 +1,7 @@
 #
 # Author:: Adam Jacob (<adam@chef.io>)
 # Author:: Christopher Walters (<cw@chef.io>)
-# Copyright:: Copyright 2008-2016, 2009-2017, Chef Software Inc.
+# Copyright:: Copyright 2008-2016, 2009-2019, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,31 +17,32 @@
 # limitations under the License.
 #
 
-require "chef/mixin/from_file"
-require "chef/mixin/convert_to_class_name"
-require "chef/mixin/enforce_ownership_and_permissions"
-require "chef/mixin/why_run"
-require "chef/mixin/shell_out"
-require "chef/mixin/provides"
-require "chef/dsl/core"
-require "chef/platform/service_helpers"
-require "chef/node_map"
-require "forwardable"
+require_relative "mixin/from_file"
+require_relative "mixin/convert_to_class_name"
+require_relative "mixin/enforce_ownership_and_permissions"
+require_relative "mixin/why_run"
+require_relative "mixin/shell_out"
+require_relative "mixin/provides"
+require_relative "dsl/core"
+require_relative "platform/service_helpers"
+require_relative "node_map"
+require "forwardable" unless defined?(Forwardable)
 
 class Chef
   class Provider
-    require "chef/mixin/why_run"
-    require "chef/mixin/provides"
+    require_relative "mixin/why_run"
+    require_relative "mixin/provides"
 
     attr_accessor :new_resource
     attr_accessor :current_resource
     attr_accessor :run_context
 
     attr_reader :recipe_name
-    attr_reader :cookbook_name
+    attr_reader :logger
 
     include Chef::Mixin::WhyRun
     extend Chef::Mixin::Provides
+    extend Forwardable
 
     # includes the "core" DSL and not the "recipe" DSL by design
     include Chef::DSL::Core
@@ -58,6 +59,7 @@ class Chef
     # @since 13.0
     # @param name [String, Symbol] Name of the action to define.
     # @param block [Proc] Body of the action.
+    #
     # @return [void]
     def self.action(name, &block)
       # We need the block directly in a method so that `super` works.
@@ -77,11 +79,14 @@ class Chef
       # Chef.deprecated(:use_inline_resources, "The use_inline_resources mode is no longer optional and the line enabling it can be removed")
     end
 
-    #--
-    # TODO: this should be a reader, and the action should be passed in the
+    # delegate to the resource
+    #
+    def_delegators :@new_resource, :property_is_set?
+
+    # @todo this should be a reader, and the action should be passed in the
     # constructor; however, many/most subclasses override the constructor so
     # changing the arity would be a breaking change. Change this at the next
-    # break, e.g., Chef 11.
+    # major release
     attr_accessor :action
 
     def initialize(new_resource, run_context)
@@ -91,15 +96,28 @@ class Chef
       @run_context = run_context
       @converge_actions = nil
 
+      @logger = if run_context
+                  run_context.logger.with_child({ resource: new_resource.name, cookbook: cookbook_name, recipe: recipe_name })
+                else
+                  Chef::Log.with_child({ resource: new_resource.name, cookbook: cookbook_name, recipe: recipe_name })
+                end
+
       @recipe_name = nil
       @cookbook_name = nil
       self.class.include_resource_dsl_module(new_resource)
     end
 
+    # has why-run mode been enabled?
+    #
+    # @return [Boolean]
     def whyrun_mode?
       Chef::Config[:why_run]
     end
 
+    # as of Chef 13 we enable why-run by default and require resources to override this to set false.
+    # We're keeping this method to prevent breaking the cookbook world for no real gain on our part.
+    #
+    # @return [Boolean]
     def whyrun_supported?
       true
     end
@@ -117,21 +135,21 @@ class Chef
       new_resource.cookbook_name
     end
 
-    def check_resource_semantics!
-    end
+    def check_resource_semantics!; end
 
+    # a simple placeholder method that will be called / raise if a resource tries to
+    # use current_resource without defining a load_current_resource method.
     def load_current_resource
       raise Chef::Exceptions::Override, "You must override load_current_resource in #{self}"
     end
 
-    def define_resource_requirements
-    end
+    def define_resource_requirements; end
 
-    def cleanup_after_converge
-    end
+    def cleanup_after_converge; end
 
+    # the :nothing action which is available on all resources by default
     def action_nothing
-      Chef::Log.debug("Doing nothing for #{@new_resource}")
+      logger.trace("Doing nothing for #{@new_resource}")
       true
     end
 
@@ -142,9 +160,7 @@ class Chef
     def run_action(action = nil)
       @action = action unless action.nil?
 
-      # TODO: it would be preferable to get the action to be executed in the
-      # constructor...
-
+      # @todo it would be preferable to get the action to be executed in the constructor...
       check_resource_semantics!
 
       # user-defined LWRPs may include unsafe load_current_resource methods that cannot be run in whyrun mode
@@ -198,6 +214,20 @@ class Chef
       @requirements ||= ResourceRequirements.new(@new_resource, run_context)
     end
 
+    def description(description = "NOT_PASSED")
+      if description != "NOT_PASSED"
+        @description = description
+      end
+      @description
+    end
+
+    def introduced(introduced = "NOT_PASSED")
+      if introduced != "NOT_PASSED"
+        @introduced = introduced
+      end
+      @introduced
+    end
+
     def converge_by(descriptions, &block)
       converge_actions.add_action(descriptions, &block)
     end
@@ -208,11 +238,13 @@ class Chef
     def compile_and_converge_action(&block)
       old_run_context = run_context
       @run_context = run_context.create_child
+      @run_context.resource_collection.unified_mode = new_resource.class.unified_mode
+      runner = Chef::Runner.new(@run_context)
       return_value = instance_eval(&block)
-      Chef::Runner.new(run_context).converge
+      runner.converge
       return_value
     ensure
-      if run_context.resource_collection.any? { |r| r.updated? }
+      if run_context.resource_collection.any?(&:updated?)
         new_resource.updated_by_last_action(true)
       end
       @run_context = old_run_context
@@ -236,12 +268,12 @@ class Chef
     # @return [Boolean] whether the block was executed.
     #
     def converge_if_changed(*properties, &converge_block)
-      if !converge_block
+      unless converge_block
         raise ArgumentError, "converge_if_changed must be passed a block!"
       end
 
-      properties = new_resource.class.state_properties.map { |p| p.name } if properties.empty?
-      properties = properties.map { |p| p.to_sym }
+      properties = new_resource.class.state_properties.map(&:name) if properties.empty?
+      properties = properties.map(&:to_sym)
       if current_resource
         # Collect the list of modified properties
         specified_properties = properties.select { |property| new_resource.property_is_set?(property) }
@@ -250,16 +282,22 @@ class Chef
           properties_str = if new_resource.sensitive
                              specified_properties.join(", ")
                            else
-                             specified_properties.map { |p| "#{p}=#{new_resource.send(p).inspect}" }.join(", ")
+                             specified_properties.map do |property|
+                               "#{property}=" << if new_resource.class.properties[property].sensitive?
+                                                   "(suppressed sensitive property)"
+                                                 else
+                                                   new_resource.send(property).inspect
+                                                 end
+                             end.join(", ")
                            end
-          Chef::Log.debug("Skipping update of #{new_resource}: has not changed any of the specified properties #{properties_str}.")
+          logger.debug("Skipping update of #{new_resource}: has not changed any of the specified properties #{properties_str}.")
           return false
         end
 
         # Print the pretty green text and run the block
-        property_size = modified.map { |p| p.size }.max
+        property_size = modified.map(&:size).max
         modified.map! do |p|
-          properties_str = if new_resource.sensitive
+          properties_str = if new_resource.sensitive || new_resource.class.properties[p].sensitive?
                              "(suppressed sensitive property)"
                            else
                              "#{new_resource.send(p).inspect} (was #{current_resource.send(p).inspect})"
@@ -271,10 +309,10 @@ class Chef
       else
         # The resource doesn't exist. Mark that we are *creating* this, and
         # write down any properties we are setting.
-        property_size = properties.map { |p| p.size }.max
+        property_size = properties.map(&:size).max
         created = properties.map do |property|
           default = " (default value)" unless new_resource.property_is_set?(property)
-          properties_str = if new_resource.sensitive
+          properties_str = if new_resource.sensitive || new_resource.class.properties[property].sensitive?
                              "(suppressed sensitive property)"
                            else
                              new_resource.send(property).inspect
@@ -323,45 +361,16 @@ class Chef
           extend Forwardable
           define_singleton_method(:to_s) { "forwarder module for #{provider_class}" }
           define_singleton_method(:inspect) { to_s }
-          # Add a delegator for each explicit property that will get the *current* value
-          # of the property by default instead of the *actual* value.
-          resource.class.properties.each do |name, property|
-            class_eval(<<-EOM, __FILE__, __LINE__)
-              def #{name}(*args, &block)
-                # If no arguments were passed, we process "get" by defaulting
-                # the value to current_resource, not new_resource. This helps
-                # avoid issues where resources accidentally overwrite perfectly
-                # valid stuff with default values.
-                #
-                # This magic is to make this kind of thing easy:
-                #
-                # FileUtils.chown new_resource.mode.nil? ? current_resource.mode : new_resource.mode, new_resource.path
-                #
-                # We do this in the file provider where we need to construct a new filesystem object and
-                # when the new_resource is nil/default that means "preserve the current stuff" and does not
-                # mean to ignore it which will wind up defaulting to changing the file to have a "root"
-                # ownership if anything else changes.  Its kind of overly clever and magical, and most likely
-                # gets the use case wrong where someone has a property that they really mean to default to
-                # some value which /should/ get set if its left as the default and where the default is
-                # meant to be declarative.  Instead of property_is_set? we should most likely be using
-                # nil? but we're going to deprecate all of it anyway.  Just type out what you really mean longhand.
-                #
-                if args.empty? && !block
-                  if !new_resource.property_is_set?(__method__) && current_resource
-                    Chef.deprecated(:namespace_collisions, "rename #{name} to current_resource.#{name}")
-                    return current_resource.public_send(__method__)
-                  end
-                end
-                Chef.deprecated(:namespace_collisions, "rename #{name} to new_resource.#{name}")
-                new_resource.public_send(__method__, *args, &block)
-              end
-            EOM
-          end
+          # this magic, stated simply, is that any instance method declared directly on
+          # the resource we are building, will be accessible from the action_class(provider)
+          # instance.  methods declared on Chef::Resource and properties are not inherited.
           dsl_methods =
             resource.class.public_instance_methods +
             resource.class.protected_instance_methods -
             provider_class.instance_methods -
-            resource.class.properties.keys
+            resource.class.properties.keys -
+            resource.class.properties.keys.map { |k| "#{k}=".to_sym } -
+            Chef::Resource.instance_methods
           def_delegators(:new_resource, *dsl_methods)
         end
         include @included_resource_dsl_module
@@ -370,6 +379,9 @@ class Chef
 
     protected
 
+    # stores all actions that have been converged
+    #
+    # @return [ConvergeActions]
     def converge_actions
       @converge_actions ||= ConvergeActions.new(@new_resource, run_context, @action)
     end
@@ -400,7 +412,7 @@ class Chef
 end
 
 # Requiring things at the bottom breaks cycles
-require "chef/chef_class"
-require "chef/mixin/why_run"
-require "chef/resource_collection"
-require "chef/runner"
+require_relative "chef_class"
+require_relative "mixin/why_run"
+require_relative "resource_collection"
+require_relative "runner"

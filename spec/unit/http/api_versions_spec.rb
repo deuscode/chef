@@ -1,5 +1,5 @@
 #
-# Copyright:: Copyright 2017, Chef Software, Inc.
+# Copyright:: Copyright 2017-2017, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,7 +27,7 @@ describe Chef::HTTP::APIVersions do
   end
 
   let(:method) { "GET" }
-  let(:url) { "http://dummy.com" }
+  let(:url) { "http://localhost:60123" }
   let(:headers) { {} }
   let(:data) { false }
 
@@ -43,7 +43,7 @@ describe Chef::HTTP::APIVersions do
   end
 
   let(:response) do
-    m = double("HttpResponse", :body => response_body)
+    m = double("HttpResponse", body: response_body)
     allow(m).to receive(:key?).with("x-ops-server-api-version").and_return(true)
     allow(m).to receive(:code).and_return(return_value)
     allow(m).to receive(:[]) do |key|
@@ -53,8 +53,11 @@ describe Chef::HTTP::APIVersions do
     m
   end
 
+  let(:client) do
+    TestVersionClient.new(url, { version_class: VersionedClassVersions })
+  end
+
   let(:middleware) do
-    client = TestVersionClient.new(url)
     client.middlewares[0]
   end
 

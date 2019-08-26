@@ -16,10 +16,10 @@
 # limitations under the License.
 #
 
-require "tempfile"
-require "chef/provider/execute"
-require "chef/win32/security" if Chef::Platform.windows?
-require "forwardable"
+require "tempfile" unless defined?(Tempfile)
+require_relative "execute"
+require_relative "../win32/security" if Chef::Platform.windows?
+require "forwardable" unless defined?(Forwardable)
 
 class Chef
   class Provider
@@ -49,10 +49,6 @@ class Chef
 
       def load_current_resource
         super
-        # @todo Chef-13: change this to an exception
-        if code.nil?
-          Chef::Log.warn "#{new_resource}: No code attribute was given, resource does nothing, this behavior is deprecated and will be removed in Chef-13"
-        end
       end
 
       def action_run

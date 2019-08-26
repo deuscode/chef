@@ -16,14 +16,14 @@
 # limitations under the License.
 #
 
-require "chef/version"
-require "chef/util/path_helper"
+require_relative "../../version"
+require_relative "../../util/path_helper"
 class Chef
   class Knife
     class SubcommandLoader
       class GemGlobLoader < Chef::Knife::SubcommandLoader
-        MATCHES_CHEF_GEM = %r{/chef-[\d]+\.[\d]+\.[\d]+}
-        MATCHES_THIS_CHEF_GEM = %r{/chef-#{Chef::VERSION}(-\w+)?(-\w+)?/}
+        MATCHES_CHEF_GEM ||= %r{/chef-[\d]+\.[\d]+\.[\d]+}.freeze
+        MATCHES_THIS_CHEF_GEM ||= %r{/chef-#{Chef::VERSION}(-\w+)?(-\w+)?/}.freeze
 
         def subcommand_files
           @subcommand_files ||= (gem_and_builtin_subcommands.values + site_subcommands).flatten.uniq
@@ -39,7 +39,7 @@ class Chef
         # subcommand loader has been modified to load the plugins by using Kernel.load
         # with the absolute path.
         def gem_and_builtin_subcommands
-          require "rubygems"
+          require "rubygems" unless defined?(Gem)
           find_subcommands_via_rubygems
         rescue LoadError
           find_subcommands_via_dirglob
@@ -111,14 +111,14 @@ class Chef
 
         def check_spec_for_glob(spec, glob)
           dirs = if spec.require_paths.size > 1
-                   "{#{spec.require_paths.join(',')}}"
+                   "{#{spec.require_paths.join(",")}}"
                  else
                    spec.require_paths.first
                  end
 
           glob = File.join(Chef::Util::PathHelper.escape_glob_dir(spec.full_gem_path, dirs), glob)
 
-          Dir[glob].map { |f| f.untaint }
+          Dir[glob].map(&:untaint)
         end
 
         def from_different_chef_version?(path)

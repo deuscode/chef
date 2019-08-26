@@ -16,8 +16,8 @@
 # limitations under the License.
 #
 
-require "tempfile"
-require "chef/http/simple"
+require "tempfile" unless defined?(Tempfile)
+require_relative "../http/simple"
 
 class Chef
   class Provider
@@ -37,11 +37,11 @@ class Chef
         # CHEF-4762: we expect a nil return value from Chef::HTTP for a "200 Success" response
         # and false for a "304 Not Modified" response
         modified = @http.head(
-          "#{new_resource.url}",
+          (new_resource.url).to_s,
           new_resource.headers
         )
-        Chef::Log.info("#{new_resource} HEAD to #{new_resource.url} successful")
-        Chef::Log.debug("#{new_resource} HEAD request response: #{modified}")
+        logger.info("#{new_resource} HEAD to #{new_resource.url} successful")
+        logger.trace("#{new_resource} HEAD request response: #{modified}")
         # :head is usually used to trigger notifications, which converge_by now does
         if modified != false
           converge_by("#{new_resource} HEAD to #{new_resource.url} returned modified, trigger notifications") {}
@@ -54,11 +54,25 @@ class Chef
 
           message = check_message(new_resource.message)
           body = @http.get(
-            "#{new_resource.url}",
+            (new_resource.url).to_s,
             new_resource.headers
           )
-          Chef::Log.info("#{new_resource} GET to #{new_resource.url} successful")
-          Chef::Log.debug("#{new_resource} GET request response: #{body}")
+          logger.info("#{new_resource} GET to #{new_resource.url} successful")
+          logger.trace("#{new_resource} GET request response: #{body}")
+        end
+      end
+
+      # Send a PATCH request to new_resource.url, with the message as the payload
+      def action_patch
+        converge_by("#{new_resource} PATCH to #{new_resource.url}") do
+          message = check_message(new_resource.message)
+          body = @http.patch(
+            (new_resource.url).to_s,
+            message,
+            new_resource.headers
+          )
+          logger.info("#{new_resource} PATCH to #{new_resource.url} successful")
+          logger.trace("#{new_resource} PATCH request response: #{body}")
         end
       end
 
@@ -67,12 +81,12 @@ class Chef
         converge_by("#{new_resource} PUT to #{new_resource.url}") do
           message = check_message(new_resource.message)
           body = @http.put(
-            "#{new_resource.url}",
+            (new_resource.url).to_s,
             message,
             new_resource.headers
           )
-          Chef::Log.info("#{new_resource} PUT to #{new_resource.url} successful")
-          Chef::Log.debug("#{new_resource} PUT request response: #{body}")
+          logger.info("#{new_resource} PUT to #{new_resource.url} successful")
+          logger.trace("#{new_resource} PUT request response: #{body}")
         end
       end
 
@@ -81,12 +95,12 @@ class Chef
         converge_by("#{new_resource} POST to #{new_resource.url}") do
           message = check_message(new_resource.message)
           body = @http.post(
-            "#{new_resource.url}",
+            (new_resource.url).to_s,
             message,
             new_resource.headers
           )
-          Chef::Log.info("#{new_resource} POST to #{new_resource.url} message: #{message.inspect} successful")
-          Chef::Log.debug("#{new_resource} POST request response: #{body}")
+          logger.info("#{new_resource} POST to #{new_resource.url} message: #{message.inspect} successful")
+          logger.trace("#{new_resource} POST request response: #{body}")
         end
       end
 
@@ -94,19 +108,19 @@ class Chef
       def action_delete
         converge_by("#{new_resource} DELETE to #{new_resource.url}") do
           body = @http.delete(
-            "#{new_resource.url}",
+            (new_resource.url).to_s,
             new_resource.headers
           )
           new_resource.updated_by_last_action(true)
-          Chef::Log.info("#{new_resource} DELETE to #{new_resource.url} successful")
-          Chef::Log.debug("#{new_resource} DELETE request response: #{body}")
+          logger.info("#{new_resource} DELETE to #{new_resource.url} successful")
+          logger.trace("#{new_resource} DELETE request response: #{body}")
         end
       end
 
       private
 
       def check_message(message)
-        if message.kind_of?(Proc)
+        if message.is_a?(Proc)
           message.call
         else
           message

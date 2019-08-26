@@ -15,9 +15,9 @@
 # limitations under the License.
 #
 
-require "chef/provider/package"
-require "chef/resource/chocolatey_package"
-require "chef/mixin/powershell_out"
+require_relative "../package"
+require_relative "../../resource/chocolatey_package"
+require_relative "../../mixin/powershell_out"
 
 class Chef
   class Provider
@@ -25,19 +25,19 @@ class Chef
       class Chocolatey < Chef::Provider::Package
         include Chef::Mixin::PowershellOut
 
-        provides :chocolatey_package, os: "windows"
+        provides :chocolatey_package
 
         # Declare that our arguments should be arrays
         use_multipackage_api
 
         PATHFINDING_POWERSHELL_COMMAND = "[System.Environment]::GetEnvironmentVariable('ChocolateyInstall', 'MACHINE')".freeze
-        CHOCO_MISSING_MSG = <<-EOS.freeze
-Could not locate your Chocolatey install. To install chocolatey, we recommend
-the 'chocolatey' cookbook (https://github.com/chocolatey/chocolatey-cookbook).
-If Chocolatey is installed, ensure that the 'ChocolateyInstall' environment
-variable is correctly set. You can verify this with the PowerShell command
-'#{PATHFINDING_POWERSHELL_COMMAND}'.
-EOS
+        CHOCO_MISSING_MSG = <<~EOS.freeze
+          Could not locate your Chocolatey install. To install chocolatey, we recommend
+          the 'chocolatey' cookbook (https://github.com/chocolatey/chocolatey-cookbook).
+          If Chocolatey is installed, ensure that the 'ChocolateyInstall' environment
+          variable is correctly set. You can verify this with the PowerShell command
+          '#{PATHFINDING_POWERSHELL_COMMAND}'.
+        EOS
 
         # Responsible for building the current_resource.
         #
@@ -54,13 +54,13 @@ EOS
 
           # The check that Chocolatey is installed is in #choco_exe.
 
-          # Chocolatey source attribute points to an alternate feed
+          # Chocolatey source property points to an alternate feed
           # and not a package specific alternate source like other providers
           # so we want to assert candidates exist for the alternate source
           requirements.assert(:upgrade, :install) do |a|
             a.assertion { candidates_exist_for_all_uninstalled? }
-            a.failure_message(Chef::Exceptions::Package, "No candidate version available for #{packages_missing_candidates.join(', ')}")
-            a.whyrun("Assuming a repository that offers #{packages_missing_candidates.join(', ')} would have been configured")
+            a.failure_message(Chef::Exceptions::Package, "No candidate version available for #{packages_missing_candidates.join(", ")}")
+            a.whyrun("Assuming a repository that offers #{packages_missing_candidates.join(", ")} would have been configured")
           end
         end
 
@@ -124,14 +124,6 @@ EOS
           choco_command("uninstall -y", cmd_args(include_source: false), *names)
         end
 
-        # Support :uninstall as an action in order for users to easily convert
-        # from the `chocolatey` provider in the cookbook.  It is, however,
-        # already deprecated.
-        def action_uninstall
-          Chef::Log.deprecation "The use of action :uninstall on the chocolatey_package provider is deprecated, please use :remove"
-          action_remove
-        end
-
         # Choco does not have dpkg's distinction between purge and remove
         alias purge_package remove_package
 
@@ -140,6 +132,17 @@ EOS
         def check_resource_semantics!; end
 
         private
+
+        def version_compare(v1, v2)
+          if v1 == "latest" || v2 == "latest"
+            return 0
+          end
+
+          gem_v1 = Gem::Version.new(v1)
+          gem_v2 = Gem::Version.new(v2)
+
+          gem_v1 <=> gem_v2
+        end
 
         # Magic to find where chocolatey is installed in the system, and to
         # return the full path of choco.exe
@@ -151,6 +154,7 @@ EOS
               # run before choco.exe gets called from #load_current_resource.
               exe_path = ::File.join(choco_install_path.to_s, "bin", "choco.exe")
               raise Chef::Exceptions::MissingLibrary, CHOCO_MISSING_MSG unless ::File.exist?(exe_path)
+
               exe_path
             end
         end
@@ -168,7 +172,7 @@ EOS
         # @param args [String] variable number of string arguments
         # @return [Mixlib::ShellOut] object returned from shell_out!
         def choco_command(*args)
-          shell_out_with_timeout!(args_to_string(choco_exe, *args), returns: new_resource.returns)
+          shell_out!(args_to_string(choco_exe, *args), returns: new_resource.returns)
         end
 
         # Use the available_packages Hash helper to create an array suitable for
@@ -226,15 +230,23 @@ EOS
         #
         # @return [Hash] name-to-version mapping of available packages
         def available_packages
-          @available_packages ||=
-            begin
-              cmd = [ "list -r #{package_name_array.join ' '}" ]
-              cmd.push( "-source #{new_resource.source}" ) if new_resource.source
-              raw = parse_list_output(*cmd)
-              raw.keys.each_with_object({}) do |name, available|
-                available[name] = desired_name_versions[name] || raw[name]
+          return @available_packages if @available_packages
+
+          @available_packages = {}
+          package_name_array.each do |pkg|
+            available_versions =
+              begin
+                cmd = [ "list -r #{pkg}" ]
+                cmd.push( "-source #{new_resource.source}" ) if new_resource.source
+                cmd.push( new_resource.options ) if new_resource.options
+
+                raw = parse_list_output(*cmd)
+                raw.keys.each_with_object({}) do |name, available|
+                  available[name] = desired_name_versions[name] || raw[name]
+                end
               end
-            end
+            @available_packages.merge! available_versions
+          end
           @available_packages
         end
 
@@ -256,6 +268,7 @@ EOS
           hash = {}
           choco_command(*args).stdout.each_line do |line|
             next if line.start_with?("Chocolatey v")
+
             name, version = line.split("|")
             hash[name.downcase] = version&.chomp
           end

@@ -1,5 +1,30 @@
 require "support/shared/integration/integration_helper"
 
+class NoActionJackson < Chef::Resource
+  use_automatic_resource_name
+
+  def foo(value = nil)
+    @foo = value if value
+    @foo
+  end
+
+  class <<self
+    attr_accessor :action_was
+  end
+end
+
+class WeirdActionJackson < Chef::Resource
+  use_automatic_resource_name
+
+  class <<self
+    attr_accessor :action_was
+  end
+
+  action :Straße do
+    WeirdActionJackson.action_was = action
+  end
+end
+
 # Houses any classes we declare
 module ResourceActionSpec
 
@@ -129,7 +154,7 @@ module ResourceActionSpec
             ResourceActionSpec::ActionJackson.ruby_block_converged = ResourceActionSpec::ActionJackson.succeeded
           end
         end
-      EOM
+        EOM
         expect(ActionJackson.ran_action).to eq :access_attribute
         expect(ActionJackson.succeeded).to eq "foo!"
         expect(ActionJackson.ruby_block_converged).to eq "foo!"
@@ -229,7 +254,7 @@ module ResourceActionSpec
       end
 
       context "And 'action_jackgrandson' inheriting from ActionJackson and changing nothing" do
-        before(:context) do
+        before(:each) do
           class ActionJackgrandson < ActionJackson
             use_automatic_resource_name
           end
@@ -333,19 +358,6 @@ module ResourceActionSpec
     end
 
     context "With a resource with no actions" do
-      class NoActionJackson < Chef::Resource
-        use_automatic_resource_name
-
-        def foo(value = nil)
-          @foo = value if value
-          @foo
-        end
-
-        class <<self
-          attr_accessor :action_was
-        end
-      end
-
       it "the default action is :nothing" do
         converge do
           no_action_jackson "hi" do
@@ -358,112 +370,12 @@ module ResourceActionSpec
     end
 
     context "With a resource with a UTF-8 action" do
-      class WeirdActionJackson < Chef::Resource
-        use_automatic_resource_name
-
-        class <<self
-          attr_accessor :action_was
-        end
-
-        action :Straße do
-          WeirdActionJackson.action_was = action
-        end
-      end
-
       it "Running the action works" do
         expect_recipe do
           weird_action_jackson "hi"
         end.to be_up_to_date
         expect(WeirdActionJackson.action_was).to eq :Straße
       end
-    end
-
-    context "With a resource with property x" do
-      class ResourceActionSpecWithX < Chef::Resource
-        resource_name :resource_action_spec_with_x
-        property :x, default: 20
-        action :set do
-          # Access x during converge to ensure that we emit no warnings there
-          x
-        end
-      end
-
-      context "And another resource with a property x and an action that sets property x to its value" do
-        class ResourceActionSpecAlsoWithX < Chef::Resource
-          resource_name :resource_action_spec_also_with_x
-          property :x
-          action :set_x_to_x do
-            resource_action_spec_with_x "hi" do
-              x x
-            end
-          end
-          def self.x_warning_line
-            __LINE__ - 4
-          end
-          action :set_x_to_x_in_non_initializer do
-            r = resource_action_spec_with_x "hi" do
-              x 10
-            end
-            x_times_2 = r.x * 2
-          end
-          action :set_x_to_10 do
-            resource_action_spec_with_x "hi" do
-              x 10
-            end
-          end
-        end
-
-        attr_reader :x_warning_line
-
-        it "Using the enclosing resource to set x to x emits a warning that you're using the wrong x" do
-          Chef::Config[:treat_deprecation_warnings_as_errors] = false
-          recipe = converge do
-            resource_action_spec_also_with_x "hi" do
-              x 1
-              action :set_x_to_x
-            end
-          end
-          warnings = recipe.logs.lines.select { |l| l =~ /warn/i }
-          expect(warnings.size).to eq 2
-          expect(warnings[0]).to match(/property x is declared in both resource_action_spec_with_x\[hi\] and resource_action_spec_also_with_x\[hi\] action :set_x_to_x. Use new_resource.x instead. At #{__FILE__}:#{ResourceActionSpecAlsoWithX.x_warning_line}/)
-        end
-
-        it "Using the enclosing resource to set x to x outside the initializer emits no warning" do
-          Chef::Config[:treat_deprecation_warnings_as_errors] = false
-          recipe = converge do
-            resource_action_spec_also_with_x "hi" do
-              x 1
-              action :set_x_to_x_in_non_initializer
-            end
-          end
-          warnings = recipe.logs.lines.select { |l| l =~ /warn/i }
-          expect(warnings.size).to eq 1  # the deprecation warning, not the property masking one
-        end
-
-        it "Using the enclosing resource to set x to 10 emits no warning" do
-          Chef::Config[:treat_deprecation_warnings_as_errors] = false
-          recipe = converge do
-            resource_action_spec_also_with_x "hi" do
-              x 1
-              action :set_x_to_10
-            end
-          end
-          warnings = recipe.logs.lines.select { |l| l =~ /warn/i }
-          expect(warnings.size).to eq 1  # the deprecation warning, not the property masking one
-        end
-
-        it "Using the enclosing resource to set x to 10 emits no warning" do
-          Chef::Config[:treat_deprecation_warnings_as_errors] = false
-          recipe = converge do
-            r = resource_action_spec_also_with_x "hi"
-            r.x 1
-            r.action :set_x_to_10
-          end
-          warnings = recipe.logs.lines.select { |l| l =~ /warn/i }
-          expect(warnings.size).to eq 1  # the deprecation warning, not the property masking one
-        end
-      end
-
     end
 
     context "With a resource with a set_or_return property named group (same name as a resource)" do
@@ -503,13 +415,6 @@ module ResourceActionSpec
             "blah"
           end
         end
-      end
-
-      it "Raises an error when attempting to use a template in the action" do
-        Chef::Config[:treat_deprecation_warnings_as_errors] = false
-        expect_converge do
-          has_property_named_template "hi"
-        end.to raise_error(/Property `template` of `has_property_named_template\[hi\]` was incorrectly passed a block.  Possible property-resource collision.  To call a resource named `template` either rename the property or else use `declare_resource\(:template, ...\)`/)
       end
     end
 

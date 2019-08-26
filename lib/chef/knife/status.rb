@@ -16,9 +16,10 @@
 # limitations under the License.
 #
 
-require "chef/knife"
-require "chef/knife/core/status_presenter"
-require "chef/knife/core/node_presenter"
+require_relative "../knife"
+require_relative "core/status_presenter"
+require_relative "core/node_presenter"
+require_relative "../dist"
 
 class Chef
   class Knife
@@ -26,29 +27,24 @@ class Chef
       include Knife::Core::NodeFormattingOptions
 
       deps do
-        require "chef/search/query"
+        require_relative "../search/query"
       end
 
       banner "knife status QUERY (options)"
 
       option :run_list,
-        :short => "-r",
-        :long => "--run-list",
-        :description => "Show the run list"
+        short: "-r",
+        long: "--run-list",
+        description: "Show the run list"
 
       option :sort_reverse,
-        :short => "-s",
-        :long => "--sort-reverse",
-        :description => "Sort the status list by last run time descending"
-
-      option :hide_healthy,
-        :short => "-H",
-        :long => "--hide-healthy",
-        :description => "Hide nodes that have run chef in the last hour. [DEPRECATED] Use --hide-by-mins MINS instead"
+        short: "-s",
+        long: "--sort-reverse",
+        description: "Sort the status list by last run time descending"
 
       option :hide_by_mins,
-        :long => "--hide-by-mins MINS",
-        :description => "Hide nodes that have run chef in the last MINS minutes"
+        long: "--hide-by-mins MINS",
+        description: "Hide nodes that have run #{Chef::Dist::CLIENT} in the last MINS minutes"
 
       def append_to_query(term)
         @query << " AND " unless @query.empty?
@@ -70,14 +66,6 @@ class Chef
         @query ||= ""
         append_to_query(@name_args[0]) if @name_args[0]
         append_to_query("chef_environment:#{config[:environment]}") if config[:environment]
-
-        if config[:hide_healthy]
-          ui.warn("-H / --hide-healthy is deprecated. Use --hide-by-mins MINS instead")
-          time = Time.now.to_i
-          # AND NOT is not valid lucene syntax, so don't use append_to_query
-          @query << " " unless @query.empty?
-          @query << "NOT ohai_time:[#{(time - 60 * 60)} TO #{time}]"
-        end
 
         if config[:hide_by_mins]
           hidemins = config[:hide_by_mins].to_i

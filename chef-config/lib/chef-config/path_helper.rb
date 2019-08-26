@@ -1,6 +1,6 @@
 #
 # Author:: Bryan McLellan <btm@loftninjas.org>
-# Copyright:: Copyright 2014-2016, Chef Software, Inc.
+# Copyright:: Copyright 2014-2018, Chef Software, Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,9 +16,9 @@
 # limitations under the License.
 #
 
-require "chef-config/windows"
-require "chef-config/logger"
-require "chef-config/exceptions"
+require_relative "windows"
+require_relative "logger"
+require_relative "exceptions"
 
 module ChefConfig
   class PathHelper
@@ -63,7 +63,7 @@ module ChefConfig
       trailing_slashes = /[#{path_separator_regex}]+$/
       leading_slashes = /^[#{path_separator_regex}]+/
 
-      args.flatten.inject() do |joined_path, component|
+      args.flatten.inject do |joined_path, component|
         joined_path = joined_path.sub(trailing_slashes, "")
         component = component.sub(leading_slashes, "")
         joined_path + "#{path_separator}#{component}"
@@ -79,7 +79,7 @@ module ChefConfig
         end
 
         if windows_max_length_exceeded?(path)
-          ChefConfig.logger.debug("Path '#{path}' is longer than #{WIN_MAX_PATH}, prefixing with'\\\\?\\'")
+          ChefConfig.logger.trace("Path '#{path}' is longer than #{WIN_MAX_PATH}, prefixing with'\\\\?\\'")
           path.insert(0, "\\\\?\\")
         end
       end
@@ -152,7 +152,7 @@ module ChefConfig
       canonical_path(path1) == canonical_path(path2)
     end
 
-    # Note: this method is deprecated. Please use escape_glob_dirs
+    # @deprecated this method is deprecated. Please use escape_glob_dirs
     # Paths which may contain glob-reserved characters need
     # to be escaped before globbing can be done.
     # http://stackoverflow.com/questions/14127343
@@ -172,6 +172,18 @@ module ChefConfig
       Pathname.new(cleanpath(to)).relative_path_from(Pathname.new(cleanpath(from)))
     end
 
+    # Set the project-specific home directory environment variable.
+    #
+    # This can be used to allow per-tool home directory aliases like $KNIFE_HOME.
+    #
+    # @param [env_var] Key for an environment variable to use.
+    # @return [nil]
+    def self.per_tool_home_environment=(env_var)
+      @@per_tool_home_environment = env_var
+      # Reset this in case .home was already called.
+      @@home_dir = nil
+    end
+
     # Retrieves the "home directory" of the current user while trying to ascertain the existence
     # of said directory.  The path returned uses / for all separators (the ruby standard format).
     # If the home directory doesn't exist or an error is otherwise encountered, nil is returned.
@@ -185,7 +197,9 @@ module ChefConfig
     # Home-path discovery is performed once.  If a path is discovered, that value is memoized so
     # that subsequent calls to home_dir don't bounce around.
     #
-    # See self.all_homes.
+    # @see all_homes
+    # @param args [Array<String>] Path components to look for under the home directory.
+    # @return [String]
     def self.home(*args)
       @@home_dir ||= all_homes { |p| break p }
       if @@home_dir
@@ -203,6 +217,8 @@ module ChefConfig
     # if no block is provided.
     def self.all_homes(*args)
       paths = []
+      paths << ENV[@@per_tool_home_environment] if defined?(@@per_tool_home_environment) && @@per_tool_home_environment && ENV[@@per_tool_home_environment]
+      paths << ENV["CHEF_HOME"] if ENV["CHEF_HOME"]
       if ChefConfig.windows?
         # By default, Ruby uses the the following environment variables to determine Dir.home:
         # HOME
@@ -235,7 +251,7 @@ module ChefConfig
       paths = paths.map { |home_path| home_path.gsub(path_separator, ::File::SEPARATOR) if home_path }
 
       # Filter out duplicate paths and paths that don't exist.
-      valid_paths = paths.select { |home_path| home_path && Dir.exists?(home_path.force_encoding("utf-8")) }
+      valid_paths = paths.select { |home_path| home_path && Dir.exist?(home_path.force_encoding("utf-8")) }
       valid_paths = valid_paths.uniq
 
       # Join all optional path elements at the end.
@@ -251,7 +267,7 @@ module ChefConfig
     # Determine if the given path is protected by OS X System Integrity Protection.
     def self.is_sip_path?(path, node)
       if node["platform"] == "mac_os_x" && Gem::Version.new(node["platform_version"]) >= Gem::Version.new("10.11")
-          # todo: parse rootless.conf for this?
+          # @todo: parse rootless.conf for this?
         sip_paths = [
           "/System", "/bin", "/sbin", "/usr"
         ]
@@ -278,6 +294,29 @@ module ChefConfig
       end
       ChefConfig.logger.error("Cannot write to a SIP Path on OS X 10.11+")
       false
+    end
+
+    # Splits a string into an array of tokens as commands and arguments
+    #
+    # str = 'command with "some arguments"'
+    # split_args(str) => ["command", "with", "\"some arguments\""]
+    #
+    def self.split_args(line)
+      cmd_args = []
+      field = ""
+      line.scan(/\s*(?>([^\s\\"]+|"([^"]*)"|'([^']*)')|(\S))(\s|\z)?/m) do |word, within_dq, within_sq, esc, sep|
+
+        # Append the string with Word & Escape Character
+        field << (word || esc.gsub(/\\(.)/, '\\1'))
+
+        # Re-build the field when any whitespace character or
+        # End of string is encountered
+        if sep
+          cmd_args << field
+          field = ""
+        end
+      end
+      cmd_args
     end
   end
 end

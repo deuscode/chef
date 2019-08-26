@@ -5,7 +5,7 @@
 # Author:: Christopher Brown (<cb@chef.io>)
 # Author:: Christopher Walters (<cw@chef.io>)
 # Author:: Daniel DeLeo (<dan@chef.io>)
-# Copyright:: Copyright 2009-2016 Chef Software, Inc.
+# Copyright:: Copyright 2009-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,14 +21,14 @@
 # limitations under the License.
 #
 
-require "tempfile"
+require "tempfile" unless defined?(Tempfile)
 require "net/https"
-require "uri"
-require "chef/http/basic_client"
-require "chef/monkey_patches/net_http"
-require "chef/config"
-require "chef/platform/query_helpers"
-require "chef/exceptions"
+require "uri" unless defined?(URI)
+require_relative "http/basic_client"
+require_relative "monkey_patches/net_http"
+require_relative "config"
+require_relative "platform/query_helpers"
+require_relative "exceptions"
 
 class Chef
 
@@ -54,7 +54,7 @@ class Chef
         # stream handlers handle responses so must be applied in reverse order
         # (same as #apply_stream_complete_middleware or #apply_response_midddleware)
         @stream_handlers.reverse.inject(next_chunk) do |chunk, handler|
-          Chef::Log.debug("Chef::HTTP::StreamHandler calling #{handler.class}#handle_chunk")
+          Chef::Log.trace("Chef::HTTP::StreamHandler calling #{handler.class}#handle_chunk")
           handler.handle_chunk(chunk)
         end
       end
@@ -144,20 +144,19 @@ class Chef
     def request(method, path, headers = {}, data = false)
       http_attempts ||= 0
       url = create_url(path)
-      method, url, headers, data = apply_request_middleware(method, url, headers, data)
+      processed_method, url, processed_headers, processed_data = apply_request_middleware(method, url, headers, data)
 
-      response, rest_request, return_value = send_http_request(method, url, headers, data)
+      response, rest_request, return_value = send_http_request(processed_method, url, processed_headers, processed_data)
       response, rest_request, return_value = apply_response_middleware(response, rest_request, return_value)
 
       response.error! unless success_response?(response)
       return_value
 
-    rescue Net::HTTPServerException => e
+    rescue Net::HTTPClientException => e
       http_attempts += 1
       response = e.response
-      if response.kind_of?(Net::HTTPNotAcceptable) && version_retries - http_attempts > 0
-        Chef::Log.debug("Negotiating protocol version with #{url}, retry #{http_attempts}/#{version_retries}")
-        sleep(http_retry_delay)
+      if response.is_a?(Net::HTTPNotAcceptable) && version_retries - http_attempts > 0
+        Chef::Log.trace("Negotiating protocol version with #{url}, retry #{http_attempts}/#{version_retries}")
         retry
       else
         raise
@@ -171,32 +170,32 @@ class Chef
       raise
     end
 
-    def streaming_request_with_progress(path, headers = {}, &progress_block)
+    def streaming_request_with_progress(path, headers = {}, tempfile = nil, &progress_block)
       http_attempts ||= 0
       url = create_url(path)
       response, rest_request, return_value = nil, nil, nil
-      tempfile = nil
+      data = nil
 
       method = :GET
-      method, url, headers, data = apply_request_middleware(method, url, headers, data)
+      method, url, processed_headers, data = apply_request_middleware(method, url, headers, data)
 
-      response, rest_request, return_value = send_http_request(method, url, headers, data) do |http_response|
-        if http_response.kind_of?(Net::HTTPSuccess)
-          tempfile = stream_to_tempfile(url, http_response, &progress_block)
+      response, rest_request, return_value = send_http_request(method, url, processed_headers, data) do |http_response|
+        if http_response.is_a?(Net::HTTPSuccess)
+          tempfile = stream_to_tempfile(url, http_response, tempfile, &progress_block)
         end
         apply_stream_complete_middleware(http_response, rest_request, return_value)
       end
-      return nil if response.kind_of?(Net::HTTPRedirection)
-      unless response.kind_of?(Net::HTTPSuccess)
+      return nil if response.is_a?(Net::HTTPRedirection)
+
+      unless response.is_a?(Net::HTTPSuccess)
         response.error!
       end
       tempfile
-    rescue Net::HTTPServerException => e
+    rescue Net::HTTPClientException => e
       http_attempts += 1
       response = e.response
-      if response.kind_of?(Net::HTTPNotAcceptable) && version_retries - http_attempts > 0
-        Chef::Log.debug("Negotiating protocol version with #{url}, retry #{http_attempts}/#{version_retries}")
-        sleep(http_retry_delay)
+      if response.is_a?(Net::HTTPNotAcceptable) && version_retries - http_attempts > 0
+        Chef::Log.trace("Negotiating protocol version with #{url}, retry #{http_attempts}/#{version_retries}")
         retry
       else
         raise
@@ -217,25 +216,26 @@ class Chef
     # you to unlink the tempfile when you're done with it.
     #
     # @yield [tempfile] block to process the tempfile
-    # @yieldparams [tempfile<Tempfile>] tempfile
-    def streaming_request(path, headers = {})
+    # @yieldparam [tempfile<Tempfile>] tempfile
+    def streaming_request(path, headers = {}, tempfile = nil)
       http_attempts ||= 0
       url = create_url(path)
       response, rest_request, return_value = nil, nil, nil
-      tempfile = nil
+      data = nil
 
       method = :GET
-      method, url, headers, data = apply_request_middleware(method, url, headers, data)
+      method, url, processed_headers, data = apply_request_middleware(method, url, headers, data)
 
-      response, rest_request, return_value = send_http_request(method, url, headers, data) do |http_response|
-        if http_response.kind_of?(Net::HTTPSuccess)
-          tempfile = stream_to_tempfile(url, http_response)
+      response, rest_request, return_value = send_http_request(method, url, processed_headers, data) do |http_response|
+        if http_response.is_a?(Net::HTTPSuccess)
+          tempfile = stream_to_tempfile(url, http_response, tempfile)
         end
         apply_stream_complete_middleware(http_response, rest_request, return_value)
       end
 
-      return nil if response.kind_of?(Net::HTTPRedirection)
-      unless response.kind_of?(Net::HTTPSuccess)
+      return nil if response.is_a?(Net::HTTPRedirection)
+
+      unless response.is_a?(Net::HTTPSuccess)
         response.error!
       end
 
@@ -247,12 +247,11 @@ class Chef
         end
       end
       tempfile
-    rescue Net::HTTPServerException => e
+    rescue Net::HTTPClientException => e
       http_attempts += 1
       response = e.response
-      if response.kind_of?(Net::HTTPNotAcceptable) && version_retries - http_attempts > 0
-        Chef::Log.debug("Negotiating protocol version with #{url}, retry #{http_attempts}/#{version_retries}")
-        sleep(http_retry_delay)
+      if response.is_a?(Net::HTTPNotAcceptable) && version_retries - http_attempts > 0
+        Chef::Log.trace("Negotiating protocol version with #{url}, retry #{http_attempts}/#{version_retries}")
         retry
       else
         raise
@@ -300,7 +299,7 @@ class Chef
         # when for most knife/chef-client work we never need/want this loaded.
 
         unless defined?(SocketlessChefZeroClient)
-          require "chef/http/socketless_chef_zero_client"
+          require_relative "http/socketless_chef_zero_client"
         end
 
         SocketlessChefZeroClient.new(base_url)
@@ -312,7 +311,8 @@ class Chef
     # @api private
     def create_url(path)
       return path if path.is_a?(URI)
-      if path =~ /^(http|https|chefzero):\/\//i
+
+      if path =~ %r{^(http|https|chefzero)://}i
         URI.parse(path)
       elsif path.nil? || path.empty?
         URI.parse(@url)
@@ -327,7 +327,7 @@ class Chef
     # @api private
     def apply_request_middleware(method, url, headers, data)
       middlewares.inject([method, url, headers, data]) do |req_data, middleware|
-        Chef::Log.debug("Chef::HTTP calling #{middleware.class}#handle_request")
+        Chef::Log.trace("Chef::HTTP calling #{middleware.class}#handle_request")
         middleware.handle_request(*req_data)
       end
     end
@@ -335,7 +335,7 @@ class Chef
     # @api private
     def apply_response_middleware(response, rest_request, return_value)
       middlewares.reverse.inject([response, rest_request, return_value]) do |res_data, middleware|
-        Chef::Log.debug("Chef::HTTP calling #{middleware.class}#handle_response")
+        Chef::Log.trace("Chef::HTTP calling #{middleware.class}#handle_response")
         middleware.handle_response(*res_data)
       end
     end
@@ -343,7 +343,7 @@ class Chef
     # @api private
     def apply_stream_complete_middleware(response, rest_request, return_value)
       middlewares.reverse.inject([response, rest_request, return_value]) do |res_data, middleware|
-        Chef::Log.debug("Chef::HTTP calling #{middleware.class}#handle_stream_complete")
+        Chef::Log.trace("Chef::HTTP calling #{middleware.class}#handle_stream_complete")
         middleware.handle_stream_complete(*res_data)
       end
     end
@@ -358,7 +358,7 @@ class Chef
 
     # @api private
     def success_response?(response)
-      response.kind_of?(Net::HTTPSuccess) || response.kind_of?(Net::HTTPRedirection)
+      response.is_a?(Net::HTTPSuccess) || response.is_a?(Net::HTTPRedirection)
     end
 
     # Runs a synchronous HTTP request, with no middleware applied (use #request
@@ -372,19 +372,26 @@ class Chef
         if block_given?
           request, response = client.request(method, url, body, headers, &response_handler)
         else
-          request, response = client.request(method, url, body, headers) { |r| r.read_body }
+          request, response = client.request(method, url, body, headers, &:read_body)
           return_value = response.read_body
         end
         @last_response = response
 
-        if response.kind_of?(Net::HTTPSuccess)
+        if response.is_a?(Net::HTTPSuccess)
           [response, request, return_value]
-        elsif response.kind_of?(Net::HTTPNotModified) # Must be tested before Net::HTTPRedirection because it's subclass.
+        elsif response.is_a?(Net::HTTPNotModified) # Must be tested before Net::HTTPRedirection because it's subclass.
           [response, request, false]
         elsif redirect_location = redirected_to(response)
-          if [:GET, :HEAD].include?(method)
+          if %i{GET HEAD}.include?(method)
             follow_redirect do
-              send_http_request(method, url + redirect_location, headers, body, &response_handler)
+              redirected_url = url + redirect_location
+              if http_disable_auth_on_redirect
+                new_headers = build_headers(method, redirected_url, headers, body)
+                new_headers.delete("Authorization") if url.host != redirected_url.host
+                send_http_request(method, redirected_url, new_headers, body, &response_handler)
+              else
+                send_http_request(method, redirected_url, headers, body, &response_handler)
+              end
             end
           else
             raise Exceptions::InvalidRedirect, "#{method} request was redirected from #{url} to #{redirect_location}. Only GET and HEAD support redirects."
@@ -406,7 +413,7 @@ class Chef
           http_attempts += 1
           response, request, return_value = yield
           # handle HTTP 50X Error
-          if response.kind_of?(Net::HTTPServerError) && !Chef::Config.local_mode
+          if response.is_a?(Net::HTTPServerError) && !Chef::Config.local_mode
             if http_retry_count - http_attempts + 1 > 0
               sleep_time = 1 + (2**http_attempts) + rand(2**http_attempts)
               Chef::Log.error("Server returned error #{response.code} for #{url}, retrying #{http_attempts}/#{http_retry_count} in #{sleep_time}s")
@@ -463,6 +470,11 @@ class Chef
     end
 
     # @api private
+    def http_disable_auth_on_redirect
+      config[:http_disable_auth_on_redirect]
+    end
+
+    # @api private
     def config
       Chef::Config
     end
@@ -470,8 +482,9 @@ class Chef
     # @api private
     def follow_redirect
       raise Chef::Exceptions::RedirectLimitExceeded if @redirects_followed >= redirect_limit
+
       @redirects_followed += 1
-      Chef::Log.debug("Following redirect #{@redirects_followed}/#{redirect_limit}")
+      Chef::Log.trace("Following redirect #{@redirects_followed}/#{redirect_limit}")
 
       yield
     ensure
@@ -486,9 +499,10 @@ class Chef
 
     # @api private
     def redirected_to(response)
-      return nil  unless response.kind_of?(Net::HTTPRedirection)
+      return nil  unless response.is_a?(Net::HTTPRedirection)
       # Net::HTTPNotModified is undesired subclass of Net::HTTPRedirection so test for this
-      return nil  if response.kind_of?(Net::HTTPNotModified)
+      return nil  if response.is_a?(Net::HTTPNotModified)
+
       response["location"]
     end
 
@@ -501,13 +515,15 @@ class Chef
     end
 
     # @api private
-    def stream_to_tempfile(url, response, &progress_block)
+    def stream_to_tempfile(url, response, tf = nil, &progress_block)
       content_length = response["Content-Length"]
-      tf = Tempfile.open("chef-rest")
-      if Chef::Platform.windows?
-        tf.binmode # required for binary files on Windows platforms
+      if tf.nil?
+        tf = Tempfile.open("chef-rest")
+        if Chef::Platform.windows?
+          tf.binmode # required for binary files on Windows platforms
+        end
       end
-      Chef::Log.debug("Streaming download from #{url} to tempfile #{tf.path}")
+      Chef::Log.trace("Streaming download from #{url} to tempfile #{tf.path}")
       # Stolen from http://www.ruby-forum.com/topic/166423
       # Kudos to _why!
 

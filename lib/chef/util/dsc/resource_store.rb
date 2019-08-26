@@ -16,9 +16,9 @@
 # limitations under the License.
 #
 
-require "chef/util/powershell/cmdlet"
-require "chef/util/powershell/cmdlet_result"
-require "chef/exceptions"
+require_relative "../powershell/cmdlet"
+require_relative "../powershell/cmdlet_result"
+require_relative "../../exceptions"
 
 class Chef
   class Util
@@ -84,7 +84,7 @@ class Chef
         # Returns a list of dsc resources
         def query_resources
           cmdlet = Chef::Util::Powershell::Cmdlet.new(nil, "get-dscresource",
-              :object)
+            :object)
           result = cmdlet.run
           result.return_value
         end
@@ -92,7 +92,7 @@ class Chef
         # Returns a list of dsc resources matching the provided name
         def query_resource(resource_name)
           cmdlet = Chef::Util::Powershell::Cmdlet.new(nil, "get-dscresource #{resource_name}",
-              :object)
+            :object)
           result = cmdlet.run
           ret_val = result.return_value
           if ret_val.nil?

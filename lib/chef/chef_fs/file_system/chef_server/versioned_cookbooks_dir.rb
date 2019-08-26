@@ -16,8 +16,8 @@
 # limitations under the License.
 #
 
-require "chef/chef_fs/file_system/chef_server/cookbooks_dir"
-require "chef/chef_fs/file_system/chef_server/versioned_cookbook_dir"
+require_relative "cookbooks_dir"
+require_relative "versioned_cookbook_dir"
 
 class Chef
   module ChefFS
@@ -50,7 +50,7 @@ class Chef
               result = []
               root.get_json("#{api_path}/?num_versions=all").each_pair do |cookbook_name, cookbooks|
                 cookbooks["versions"].each do |cookbook_version|
-                  result << VersionedCookbookDir.new("#{cookbook_name}-#{cookbook_version['version']}", self)
+                  result << VersionedCookbookDir.new("#{cookbook_name}-#{cookbook_version["version"]}", self)
                 end
               end
               result.sort_by(&:name)
@@ -78,7 +78,7 @@ class Chef
               cookbook_to_upload.freeze_version if options[:freeze]
 
               # Instantiate a new uploader based on the proxy loader
-              uploader = Chef::CookbookUploader.new(cookbook_to_upload, :force => options[:force], :rest => chef_rest)
+              uploader = Chef::CookbookUploader.new(cookbook_to_upload, force: options[:force], rest: chef_rest)
 
               with_actual_cookbooks_dir(temp_cookbooks_path) do
                 uploader.upload_cookbooks

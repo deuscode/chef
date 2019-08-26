@@ -20,7 +20,7 @@ require "spec_helper"
 
 describe Chef::Provider::OsxProfile do
   let(:shell_out_success) do
-    double("shell_out", :exitstatus => 0, :error? => false)
+    double("shell_out", exitstatus: 0, error?: false)
   end
   describe "action_create" do
     let(:node) { Chef::Node.new }
@@ -116,7 +116,7 @@ describe Chef::Provider::OsxProfile do
       allow(provider).to receive(:generate_tempfile).and_return(tempfile)
       allow(provider).to receive(:get_installed_profiles).and_call_original
       allow(provider).to receive(:read_plist).and_return(all_profiles)
-      expect(provider).to receive(:shell_out!).with("profiles -P -o '/tmp/allprofiles.plist'")
+      expect(provider).to receive(:shell_out_compacted!).with("/usr/bin/profiles", "-P", "-o", "/tmp/allprofiles.plist")
       provider.load_current_resource
     end
 
@@ -132,13 +132,14 @@ describe Chef::Provider::OsxProfile do
       provider.load_current_resource
       expect(
         provider.instance_variable_get(:@new_profile_identifier)
-        ).to eql(test_profile["PayloadIdentifier"])
+      ).to eql(test_profile["PayloadIdentifier"])
     end
 
     it "should install when not installed" do
       new_resource.profile test_profile
       allow(provider).to receive(:get_installed_profiles).and_return(no_profiles)
       provider.load_current_resource
+      expect(provider).to receive(:install_profile)
       expect { provider.run_action(:install) }.to_not raise_error
     end
 
@@ -154,6 +155,7 @@ describe Chef::Provider::OsxProfile do
       new_resource.profile test_profile
       all_profiles["_computerlevel"][1]["ProfileUUID"] = "1781fbec-3325-565f-9022-9bb39245d4dd"
       provider.load_current_resource
+      expect(provider).to receive(:install_profile)
       expect { provider.run_action(:install) }.to_not raise_error
     end
 
@@ -164,8 +166,8 @@ describe Chef::Provider::OsxProfile do
       all_profiles["_computerlevel"][1]["ProfileUUID"] = "1781fbec-3325-565f-9022-9bb39245d4dd"
       provider.load_current_resource
       allow(provider).to receive(:write_profile_to_disk).and_return(profile_path)
-      expect(provider).to receive(:shell_out).with("profiles -I -F '#{profile_path}'").and_return(shell_out_success)
-      provider.action_install()
+      expect(provider).to receive(:shell_out_compacted).with("/usr/bin/profiles", "-I", "-F", profile_path).and_return(shell_out_success)
+      provider.action_install
     end
 
     it "should fail if there is no identifier inside the profile" do
@@ -226,16 +228,14 @@ describe Chef::Provider::OsxProfile do
       new_resource.profile_name "com.testprofile.screensaver"
       new_resource.action(:remove)
       provider.load_current_resource
-      expect(provider.instance_variable_get(:@new_profile_identifier)
-        ).to eql(new_resource.profile_name)
+      expect(provider.instance_variable_get(:@new_profile_identifier)).to eql(new_resource.profile_name)
     end
 
     it "should use specified identifier" do
       new_resource.identifier "com.testprofile.screensaver"
       new_resource.action(:remove)
       provider.load_current_resource
-      expect(provider.instance_variable_get(:@new_profile_identifier)
-        ).to eql(new_resource.identifier)
+      expect(provider.instance_variable_get(:@new_profile_identifier)).to eql(new_resource.identifier)
     end
 
     it "should work with spaces in the identifier" do
@@ -248,8 +248,8 @@ describe Chef::Provider::OsxProfile do
       new_resource.identifier "com.testprofile.screensaver"
       new_resource.action(:remove)
       provider.load_current_resource
-      expect(provider).to receive(:shell_out).with("profiles -R -p '#{new_resource.identifier}'").and_return(shell_out_success)
-      provider.action_remove()
+      expect(provider).to receive(:shell_out_compacted).with("/usr/bin/profiles", "-R", "-p", new_resource.identifier).and_return(shell_out_success)
+      provider.action_remove
     end
   end
 end

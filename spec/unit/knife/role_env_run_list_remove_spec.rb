@@ -28,12 +28,12 @@ describe Chef::Knife::RoleEnvRunListRemove do
 
     @knife = Chef::Knife::RoleEnvRunListRemove.new
     @knife.config = {
-      :print_after => nil,
+      print_after: nil,
     }
     @knife.name_args = [ "will", "QA", "role[monkey]" ]
     allow(@knife).to receive(:output).and_return(true)
 
-    @role = Chef::Role.new()
+    @role = Chef::Role.new
     @role.name("will")
     allow(@role).to receive(:save).and_return(true)
 

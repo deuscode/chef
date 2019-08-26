@@ -32,12 +32,12 @@ describe "General chef_repo file system checks", :workstation do
       end
 
       it "knife list --local -Rfp / returns them" do
-        knife("list --local -Rfp /").should_succeed <<EOM
-/data_bags/
-/data_bags/bag1/
-/environments/
-/roles/
-EOM
+        knife("list --local -Rfp /").should_succeed <<~EOM
+          /data_bags/
+          /data_bags/bag1/
+          /environments/
+          /roles/
+        EOM
       end
     end
 
@@ -53,9 +53,9 @@ EOM
       before { directory "cookbooks/cookbook1" }
 
       it "knife list --local -Rfp / does not return it" do
-        knife("list --local -Rfp /").should_succeed(<<EOM, :stderr => "WARN: Cookbook 'cookbook1' is empty or entirely chefignored at #{Chef::Config.chef_repo_path}/cookbooks/cookbook1\n")
-/cookbooks/
-EOM
+        knife("list --local -Rfp /").should_succeed(<<~EOM, stderr: "WARN: Cookbook 'cookbook1' is empty or entirely chefignored at #{Chef::Config.chef_repo_path}/cookbooks/cookbook1\n")
+          /cookbooks/
+        EOM
       end
     end
 
@@ -63,9 +63,9 @@ EOM
       before { directory "cookbooks/cookbook1/recipes" }
 
       it "knife list --local -Rfp / does not return it" do
-        knife("list --local -Rfp /").should_succeed(<<EOM, :stderr => "WARN: Cookbook 'cookbook1' is empty or entirely chefignored at #{Chef::Config.chef_repo_path}/cookbooks/cookbook1\n")
-/cookbooks/
-EOM
+        knife("list --local -Rfp /").should_succeed(<<~EOM, stderr: "WARN: Cookbook 'cookbook1' is empty or entirely chefignored at #{Chef::Config.chef_repo_path}/cookbooks/cookbook1\n")
+          /cookbooks/
+        EOM
       end
     end
 
@@ -76,13 +76,13 @@ EOM
       end
 
       it "knife list --local -Rfp / does not return the empty ones" do
-        knife("list --local -Rfp /").should_succeed <<EOM
-/cookbooks/
-/cookbooks/cookbook1/
-/cookbooks/cookbook1/templates/
-/cookbooks/cookbook1/templates/default/
-/cookbooks/cookbook1/templates/default/x.txt
-EOM
+        knife("list --local -Rfp /").should_succeed <<~EOM
+          /cookbooks/
+          /cookbooks/cookbook1/
+          /cookbooks/cookbook1/templates/
+          /cookbooks/cookbook1/templates/default/
+          /cookbooks/cookbook1/templates/default/x.txt
+        EOM
       end
     end
 
@@ -90,9 +90,9 @@ EOM
       before { directory "cookbooks/cookbook1/templates/default" }
 
       it "knife list --local -Rfp / does not return it" do
-        knife("list --local -Rfp /").should_succeed(<<EOM, :stderr => "WARN: Cookbook 'cookbook1' is empty or entirely chefignored at #{Chef::Config.chef_repo_path}/cookbooks/cookbook1\n")
-/cookbooks/
-EOM
+        knife("list --local -Rfp /").should_succeed(<<~EOM, stderr: "WARN: Cookbook 'cookbook1' is empty or entirely chefignored at #{Chef::Config.chef_repo_path}/cookbooks/cookbook1\n")
+          /cookbooks/
+        EOM
       end
     end
 
@@ -104,13 +104,13 @@ EOM
       end
 
       it "knife list --local -Rfp / does not return the empty ones" do
-        knife("list --local -Rfp /").should_succeed <<EOM
-/cookbooks/
-/cookbooks/cookbook1/
-/cookbooks/cookbook1/templates/
-/cookbooks/cookbook1/templates/default/
-/cookbooks/cookbook1/templates/default/x.txt
-EOM
+        knife("list --local -Rfp /").should_succeed <<~EOM
+          /cookbooks/
+          /cookbooks/cookbook1/
+          /cookbooks/cookbook1/templates/
+          /cookbooks/cookbook1/templates/default/
+          /cookbooks/cookbook1/templates/default/x.txt
+        EOM
       end
     end
 
@@ -146,33 +146,33 @@ EOM
       end
 
       it "knife list --local -Rfp / should NOT return them" do
-        knife("list --local -Rfp /").should_succeed <<EOM
-/data_bags/
-/data_bags/bag1/
-/data_bags/bag1/item1.json
-/environments/
-/environments/environment1.json
-/roles/
-/roles/role1.json
-EOM
+        knife("list --local -Rfp /").should_succeed <<~EOM
+          /data_bags/
+          /data_bags/bag1/
+          /data_bags/bag1/item1.json
+          /environments/
+          /environments/environment1.json
+          /roles/
+          /roles/role1.json
+        EOM
       end
     end
 
     when_the_repository "has a file in cookbooks/" do
       before { file "cookbooks/file", "" }
       it "does not show up in list -Rfp" do
-        knife("list --local -Rfp /").should_succeed <<EOM
-/cookbooks/
-EOM
+        knife("list --local -Rfp /").should_succeed <<~EOM
+          /cookbooks/
+        EOM
       end
     end
 
     when_the_repository "has a file in data_bags/" do
       before { file "data_bags/file", "" }
       it "does not show up in list -Rfp" do
-        knife("list --local -Rfp /").should_succeed <<EOM
-/data_bags/
-EOM
+        knife("list --local -Rfp /").should_succeed <<~EOM
+          /data_bags/
+        EOM
       end
     end
   end

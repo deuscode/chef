@@ -1,6 +1,6 @@
 #
 # Author:: Adam Jacob (<adam@chef.io>)
-# Copyright:: Copyright 2008-2016, Chef Software Inc.
+# Copyright:: Copyright 2008-2017, Chef Software Inc.
 # License:: Apache License, eersion 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -49,10 +49,10 @@ describe Chef::Knife::CookbookShow do
     {
       "all_files" => [
         {
-          :name => "recipes/default.rb",
-          :path => "recipes/default.rb",
-          :checksum => "1234",
-          :url => "http://example.org/files/default.rb",
+          name: "recipes/default.rb",
+          path: "recipes/default.rb",
+          checksum: "1234",
+          url: "http://example.org/files/default.rb",
         },
       ],
     }
@@ -110,13 +110,12 @@ describe Chef::Knife::CookbookShow do
             "name" => nil,
             "description" => "",
             "long_description" => "",
-            "maintainer" => nil,
-            "maintainer_email" => nil,
+            "maintainer" => "",
+            "maintainer_email" => "",
             "license" => "All rights reserved",
             "platforms" => {},
             "dependencies" => {},
             "providing" => {},
-            "attributes" => {},
             "recipes" => {},
             "version" => "0.0.0",
             "source_url" => "",
@@ -172,32 +171,32 @@ describe Chef::Knife::CookbookShow do
         cb.manifest = {
           "all_files" => [
             {
-              :name => "files/afile.rb",
-              :path => "files/host-examplehost.example.org/afile.rb",
-              :checksum => "1111",
-              :specificity => "host-examplehost.example.org",
-              :url => "http://example.org/files/1111",
+              name: "files/afile.rb",
+              path: "files/host-examplehost.example.org/afile.rb",
+              checksum: "1111",
+              specificity: "host-examplehost.example.org",
+              url: "http://example.org/files/1111",
             },
             {
-              :name => "files/afile.rb",
-              :path => "files/ubuntu-9.10/afile.rb",
-              :checksum => "2222",
-              :specificity => "ubuntu-9.10",
-              :url => "http://example.org/files/2222",
+              name: "files/afile.rb",
+              path: "files/ubuntu-9.10/afile.rb",
+              checksum: "2222",
+              specificity: "ubuntu-9.10",
+              url: "http://example.org/files/2222",
             },
             {
-              :name => "files/afile.rb",
-              :path => "files/ubuntu/afile.rb",
-              :checksum => "3333",
-              :specificity => "ubuntu",
-              :url => "http://example.org/files/3333",
+              name: "files/afile.rb",
+              path: "files/ubuntu/afile.rb",
+              checksum: "3333",
+              specificity: "ubuntu",
+              url: "http://example.org/files/3333",
             },
             {
-              :name => "files/afile.rb",
-              :path => "files/default/afile.rb",
-              :checksum => "4444",
-              :specificity => "default",
-              :url => "http://example.org/files/4444",
+              name: "files/afile.rb",
+              path: "files/default/afile.rb",
+              checksum: "4444",
+              specificity: "default",
+              url: "http://example.org/files/4444",
             },
           ],
         }

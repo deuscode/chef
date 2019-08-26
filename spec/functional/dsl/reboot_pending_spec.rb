@@ -36,44 +36,25 @@ describe Chef::DSL::RebootPending, :windows_only do
     let(:reg_key) { nil }
     let(:original_set) { false }
 
-    before(:all) { @any_flag = Hash.new }
+    before(:all) { @any_flag = {} }
 
     after { @any_flag[reg_key] = original_set }
 
     describe 'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\PendingFileRenameOperations' do
       let(:reg_key) { 'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager' }
-      let(:original_set) { registry.value_exists?(reg_key, { :name => "PendingFileRenameOperations" }) }
+      let(:original_set) { registry.value_exists?(reg_key, { name: "PendingFileRenameOperations" }) }
 
       it "returns true if the registry value exists" do
         skip "found existing registry key" if original_set
         registry.set_value(reg_key,
-            { :name => "PendingFileRenameOperations", :type => :multi_string, :data => ['\??\C:\foo.txt|\??\C:\bar.txt'] })
+          { name: "PendingFileRenameOperations", type: :multi_string, data: ['\??\C:\foo.txt|\??\C:\bar.txt'] })
 
         expect(recipe.reboot_pending?).to be_truthy
       end
 
       after do
         unless original_set
-          registry.delete_value(reg_key, { :name => "PendingFileRenameOperations" })
-        end
-      end
-    end
-
-    describe 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootRequired' do
-      let(:reg_key) { 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootRequired' }
-      let(:original_set) { registry.key_exists?(reg_key) }
-
-      it "returns true if the registry key exists" do
-        skip "found existing registry key" if original_set
-        pending "Permissions are limited to 'TrustedInstaller' by default"
-        registry.create_key(reg_key, false)
-
-        expect(recipe.reboot_pending?).to be_truthy
-      end
-
-      after do
-        unless original_set
-          registry.delete_key(reg_key, false)
+          registry.delete_value(reg_key, { name: "PendingFileRenameOperations" })
         end
       end
     end

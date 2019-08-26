@@ -23,14 +23,14 @@ describe Chef::Knife::NodeDelete do
     Chef::Config[:node_name] = "webmonkey.example.com"
     @knife = Chef::Knife::NodeDelete.new
     @knife.config = {
-      :print_after => nil,
+      print_after: nil,
     }
     @knife.name_args = %w{ adam ben }
     allow(@knife).to receive(:output).and_return(true)
     allow(@knife).to receive(:confirm).and_return(true)
 
-    @adam_node = Chef::Node.new()
-    @ben_node = Chef::Node.new()
+    @adam_node = Chef::Node.new
+    @ben_node = Chef::Node.new
     allow(@ben_node).to receive(:destroy).and_return(true)
     allow(@adam_node).to receive(:destroy).and_return(true)
     allow(Chef::Node).to receive(:load).with("adam").and_return(@adam_node)

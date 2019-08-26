@@ -15,14 +15,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-require "chef/provider/registry_key"
-require "chef/resource"
-require "chef/digester"
+
+require_relative "../resource"
+require_relative "../digester"
 
 class Chef
   class Resource
     class RegistryKey < Chef::Resource
-      identity_attr :key
+      resource_name :registry_key
+      provides(:registry_key) { true }
+
+      description "Use the registry_key resource to create and delete registry keys in Microsoft Windows."
+      introduced "11.0"
+
       state_attrs :values
 
       default_action :create
@@ -61,36 +66,32 @@ class Chef
 
       def initialize(name, run_context = nil)
         super
-        @architecture = :machine
-        @recursive = false
-        @key = name
         @values, @unscrubbed_values = [], []
       end
 
-      def key(arg = nil)
-        set_or_return(
-          :key,
-          arg,
-          :kind_of => String
-        )
-      end
+      property :key, String, name_property: true, identity: true
 
       def values(arg = nil)
         if not arg.nil?
           if arg.is_a?(Hash)
-            @values = [ arg ]
+            @values = [ Mash.new(arg).symbolize_keys ]
           elsif arg.is_a?(Array)
-            @values = arg
+            @values = []
+            arg.each do |value|
+              @values << Mash.new(value).symbolize_keys
+            end
           else
             raise ArgumentError, "Bad type for RegistryKey resource, use Hash or Array"
           end
 
           @values.each do |v|
-            raise ArgumentError, "Missing name key in RegistryKey values hash" unless v.has_key?(:name)
+            raise ArgumentError, "Missing name key in RegistryKey values hash" unless v.key?(:name)
+
             v.each_key do |key|
-              raise ArgumentError, "Bad key #{key} in RegistryKey values hash" unless [:name, :type, :data].include?(key)
+              raise ArgumentError, "Bad key #{key} in RegistryKey values hash" unless %i{name type data}.include?(key)
             end
             raise ArgumentError, "Type of name => #{v[:name]} should be string" unless v[:name].is_a?(String)
+
             if v[:type]
               raise ArgumentError, "Type of type => #{v[:type]} should be symbol" unless v[:type].is_a?(Symbol)
             end
@@ -101,21 +102,8 @@ class Chef
         end
       end
 
-      def recursive(arg = nil)
-        set_or_return(
-          :recursive,
-          arg,
-          :kind_of => [TrueClass, FalseClass]
-        )
-      end
-
-      def architecture(arg = nil)
-        set_or_return(
-          :architecture,
-          arg,
-          :kind_of => Symbol
-        )
-      end
+      property :recursive, [TrueClass, FalseClass], default: false
+      property :architecture, Symbol, default: :machine, equal_to: %i{machine x86_64 i386}
 
       private
 
@@ -135,7 +123,7 @@ class Chef
       # Some data types may raise errors when sent as json. Returns true if this
       # value's data may need to be converted to a checksum.
       def needs_checksum?(value)
-        unsafe_types = [:binary, :dword, :dword_big_endian, :qword]
+        unsafe_types = %i{binary dword dword_big_endian qword}
         unsafe_types.include?(value[:type])
       end
 

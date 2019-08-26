@@ -46,7 +46,7 @@ describe Chef::DataBag do
     end
 
     it "should throw an ArgumentError if you feed it anything but a string" do
-      expect { @data_bag.name Hash.new }.to raise_error(ArgumentError)
+      expect { @data_bag.name({}) }.to raise_error(ArgumentError)
     end
 
     [ ".", "-", "_", "1"].each do |char|
@@ -88,8 +88,8 @@ describe Chef::DataBag do
     end
 
     it "should silently proceed when the data bag already exists" do
-      exception = double("409 error", :code => "409")
-      expect(@rest).to receive(:post).and_raise(Net::HTTPServerException.new("foo", exception))
+      exception = double("409 error", code: "409")
+      expect(@rest).to receive(:post).and_raise(Net::HTTPClientException.new("foo", exception))
       @data_bag.save
     end
 

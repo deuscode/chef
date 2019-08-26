@@ -1,5 +1,5 @@
-require "chef/chef_fs/file_system/base_fs_object"
-require "chef/chef_fs/file_system/nonexistent_fs_object"
+require_relative "base_fs_object"
+require_relative "nonexistent_fs_object"
 
 class Chef
   module ChefFS
@@ -39,7 +39,7 @@ class Chef
             child_entry = dir.child(name)
             if child_entry.exists?
               if result
-                Chef::Log.debug("Child with name '#{child_entry.name}' found in multiple directories: #{result.parent.path_for_printing} and #{child_entry.parent.path_for_printing}")
+                Chef::Log.trace("Child with name '#{child_entry.name}' found in multiple directories: #{result.parent.path_for_printing} and #{child_entry.parent.path_for_printing}")
               else
                 result = child_entry
               end

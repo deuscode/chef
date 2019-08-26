@@ -1,6 +1,6 @@
 #
 # Author:: Daniel DeLeo (<dan@chef.io>)
-# Copyright:: Copyright 2012-2017, Chef Software Inc.
+# Copyright:: Copyright 2012-2019, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,12 +21,17 @@ require "chef/node/immutable_collections"
 
 describe Chef::Node::ImmutableMash do
   before do
-    @data_in = { :top => { :second_level => "some value" },
+    @data_in = { "top" => { "second_level" => "some value" },
                  "top_level_2" => %w{array of values},
-                 :top_level_3 => [{ :hash_array => 1, :hash_array_b => 2 }],
-                 :top_level_4 => { :level2 => { :key => "value" } },
+                 "top_level_3" => [{ "hash_array" => 1, "hash_array_b" => 2 }],
+                 "top_level_4" => { "level2" => { "key" => "value" } },
     }
     @immutable_mash = Chef::Node::ImmutableMash.new(@data_in)
+  end
+
+  it "does not have any unaudited methods" do
+    unaudited_methods = Hash.instance_methods - Object.instance_methods - Chef::Node::Mixin::ImmutablizeHash::DISALLOWED_MUTATOR_METHODS - Chef::Node::Mixin::ImmutablizeHash::ALLOWED_METHODS
+    expect(unaudited_methods).to be_empty
   end
 
   it "element references like regular hash" do
@@ -52,6 +57,14 @@ describe Chef::Node::ImmutableMash do
   it "converts nested hashes to ImmutableMashes" do
     expect(@immutable_mash[:top_level_4]).to be_a(Chef::Node::ImmutableMash)
     expect(@immutable_mash[:top_level_4][:level2]).to be_a(Chef::Node::ImmutableMash)
+  end
+
+  # we only ever absorb VividMashes from other precedence levels, which already have
+  # been coerced to only have string keys, so we do not need to do that work twice (performance).
+  it "does not call convert_value like Mash/VividMash" do
+    @mash = Chef::Node::ImmutableMash.new({ test: "foo", "test2" => "bar" })
+    expect(@mash[:test]).to eql("foo")
+    expect(@mash["test2"]).to eql("bar")
   end
 
   describe "to_hash" do
@@ -132,25 +145,25 @@ describe Chef::Node::ImmutableMash do
     end
   end
 
-  [
-    :[]=,
-    :clear,
-    :default=,
-    :default_proc=,
-    :delete,
-    :delete_if,
-    :keep_if,
-    :merge!,
-    :update,
-    :reject!,
-    :replace,
-    :select!,
-    :shift,
-    :write,
-    :write!,
-    :unlink,
-    :unlink!,
-  ].each do |mutator|
+  %i{
+    []=
+    clear
+    default=
+    default_proc=
+    delete
+    delete_if
+    keep_if
+    merge!
+    update
+    reject!
+    replace
+    select!
+    shift
+    write
+    write!
+    unlink
+    unlink!
+  }.each do |mutator|
     it "doesn't allow mutation via `#{mutator}'" do
       expect { @immutable_mash.send(mutator) }.to raise_error(Chef::Exceptions::ImmutableAttributeModification)
     end
@@ -168,7 +181,7 @@ describe Chef::Node::ImmutableArray do
 
   before do
     @immutable_array = Chef::Node::ImmutableArray.new(%w{foo bar baz} + Array(1..3) + [nil, true, false, [ "el", 0, nil ] ])
-    immutable_mash = Chef::Node::ImmutableMash.new({ :m => "m" })
+    immutable_mash = Chef::Node::ImmutableMash.new({ "m" => "m" })
     @immutable_nested_array = Chef::Node::ImmutableArray.new(["level1", @immutable_array, immutable_mash])
   end
 
@@ -177,40 +190,44 @@ describe Chef::Node::ImmutableArray do
   # with ImmutableMash, above
   ###
 
-  [
-    :<<,
-    :[]=,
-    :clear,
-    :collect!,
-    :compact!,
-    :default=,
-    :default_proc=,
-    :delete,
-    :delete_at,
-    :delete_if,
-    :fill,
-    :flatten!,
-    :insert,
-    :keep_if,
-    :map!,
-    :merge!,
-    :pop,
-    :push,
-    :update,
-    :reject!,
-    :reverse!,
-    :replace,
-    :select!,
-    :shift,
-    :slice!,
-    :sort!,
-    :sort_by!,
-    :uniq!,
-    :unshift,
-  ].each do |mutator|
+  %i{
+    <<
+    []=
+    clear
+    collect!
+    compact!
+    default=
+    default_proc=
+    delete
+    delete_at
+    delete_if
+    fill
+    flatten!
+    insert
+    keep_if
+    map!
+    merge!
+    pop
+    push
+    reject!
+    reverse!
+    replace
+    select!
+    shift
+    slice!
+    sort!
+    sort_by!
+    uniq!
+    unshift
+  }.each do |mutator|
     it "does not allow mutation via `#{mutator}" do
       expect { @immutable_array.send(mutator) }.to raise_error(Chef::Exceptions::ImmutableAttributeModification)
     end
+  end
+
+  it "does not have any unaudited methods" do
+    unaudited_methods = Array.instance_methods - Object.instance_methods - Chef::Node::Mixin::ImmutablizeArray::DISALLOWED_MUTATOR_METHODS - Chef::Node::Mixin::ImmutablizeArray::ALLOWED_METHODS
+    expect(unaudited_methods).to be_empty
   end
 
   it "can be duped even if some elements can't" do

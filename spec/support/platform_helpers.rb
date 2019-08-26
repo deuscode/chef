@@ -46,28 +46,22 @@ require "wmi-lite/wmi" if windows?
 
 def windows_domain_joined?
   return false unless windows?
+
   wmi = WmiLite::Wmi.new
   computer_system = wmi.first_of("Win32_ComputerSystem")
   computer_system["partofdomain"]
 end
 
-def windows_win2k3?
-  return false unless windows?
-  (host_version && host_version.start_with?("5.2"))
-end
-
-def windows_2008r2_or_later?
-  return false unless windows?
-  return false unless host_version
-  components = host_version.split(".").map do |component|
-    component.to_i
-  end
-  components.length >= 2 && components[0] >= 6 && components[1] >= 1
-end
-
 def windows_2012r2?
   return false unless windows?
+
   (host_version && host_version.start_with?("6.3"))
+end
+
+def windows_gte_10?
+  return false unless windows?
+
+  Gem::Requirement.new(">= 10").satisfied_by?(Gem::Version.new(host_version))
 end
 
 def host_version
@@ -80,6 +74,7 @@ end
 
 def windows_powershell_dsc?
   return false unless windows?
+
   supports_dsc = false
   begin
     wmi = WmiLite::Wmi.new("root/microsoft/windows/desiredstateconfiguration")
@@ -97,6 +92,7 @@ end
 
 def windows_user_right?(right)
   return false unless windows?
+
   require "chef/win32/security"
   Chef::ReservedNames::Win32::Security.get_account_right(ENV["USERNAME"]).include?(right)
 end
@@ -159,6 +155,34 @@ def freebsd?
   !!(RUBY_PLATFORM =~ /freebsd/)
 end
 
+def intel_64bit?
+  !!(ohai[:kernel][:machine] == "x86_64")
+end
+
+def rhel?
+  !!(ohai[:platform_family] == "rhel")
+end
+
+def rhel6?
+  rhel? && !!(ohai[:platform_version].to_i == 6)
+end
+
+def sles11?
+  suse? && !!(ohai[:platform_version].to_i == 11)
+end
+
+def rhel7?
+  rhel? && !!(ohai[:platform_version].to_i == 7)
+end
+
+def rhel8?
+  rhel? && !!(ohai[:platform_version].to_i == 8)
+end
+
+def rhel_gte_8?
+  rhel? && !!(ohai[:platform_version].to_i >= 8)
+end
+
 def debian_family?
   !!(ohai[:platform_family] == "debian")
 end
@@ -182,7 +206,7 @@ def selinux_enabled?
   # specs independent of product.
   selinuxenabled_path = which("selinuxenabled")
   if selinuxenabled_path
-    cmd = Mixlib::ShellOut.new(selinuxenabled_path, :returns => [0, 1])
+    cmd = Mixlib::ShellOut.new(selinuxenabled_path, returns: [0, 1])
     cmd_result = cmd.run_command
     case cmd_result.exitstatus
     when 1
@@ -200,11 +224,13 @@ def selinux_enabled?
 end
 
 def suse?
-  File.exists?("/etc/SuSE-release")
+  ::File.exists?("/etc/SuSE-release") ||
+    ( ::File.exists?("/etc/os-release") && /sles|suse/.match?(File.read("/etc/os-release")) )
 end
 
 def root?
   return false if windows?
+
   Process.euid == 0
 end
 
@@ -226,6 +252,9 @@ end
 
 class HttpHelper
   extend Ohai::Mixin::HttpHelper
+  def self.logger
+    Chef::Log
+  end
 end
 
 def gce?

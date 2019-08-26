@@ -19,22 +19,21 @@
 require "spec_helper"
 
 describe Chef::Resource::Ruby do
+  let(:resource) { Chef::Resource::Ruby.new("fakey_fakerton") }
 
-  before(:each) do
-    @resource = Chef::Resource::Ruby.new("fakey_fakerton")
+  it "has a resource name of :ruby" do
+    expect(resource.resource_name).to eql(:ruby)
   end
 
-  it "should create a new Chef::Resource::Ruby" do
-    expect(@resource).to be_a_kind_of(Chef::Resource)
-    expect(@resource).to be_a_kind_of(Chef::Resource::Ruby)
+  it "sets the default action as :run" do
+    expect(resource.action).to eql([:run])
   end
 
-  it "should have a resource name of :ruby" do
-    expect(@resource.resource_name).to eql(:ruby)
+  it "supports :run action" do
+    expect { resource.action :run }.not_to raise_error
   end
 
-  it "should have an interpreter of ruby" do
-    expect(@resource.interpreter).to eql("ruby")
+  it "has an interpreter of ruby" do
+    expect(resource.interpreter).to eql("ruby")
   end
-
 end

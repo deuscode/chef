@@ -1,7 +1,7 @@
 #
 # Author:: Adam Jacob (<adam@chef.io>)
 # Author:: Kyle Goodwin (<kgoodwin@primerevenue.com>)
-# Copyright:: Copyright 2008-2016, Chef Software Inc.
+# Copyright:: Copyright 2008-2019, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -195,7 +195,7 @@ RSpec.describe ChefConfig::Config do
 
   [ false, true ].each do |is_windows|
 
-    context "On #{is_windows ? 'Windows' : 'Unix'}" do
+    context "On #{is_windows ? "Windows" : "Unix"}" do
       def to_platform(*args)
         ChefConfig::Config.platform_specific_path(*args)
       end
@@ -248,9 +248,10 @@ RSpec.describe ChefConfig::Config do
       end
 
       describe "default values" do
+        let(:system_drive) { ChefConfig::Config.env["SYSTEMDRIVE"] } if is_windows
         let :primary_cache_path do
           if is_windows
-            "#{ChefConfig::Config.env['SYSTEMDRIVE']}\\chef"
+            "#{system_drive}\\chef"
           else
             "/var/chef"
           end
@@ -273,6 +274,35 @@ RSpec.describe ChefConfig::Config do
           end
 
           allow(ChefConfig::Config).to receive(:path_accessible?).and_return(false)
+        end
+
+        describe "ChefConfig::Config[:client_key]" do
+          let(:path_to_client_key) { to_platform("/etc/chef") + ChefConfig::PathHelper.path_separator }
+
+          it "sets the default path to the client key" do
+            expect(ChefConfig::Config.client_key).to eq(path_to_client_key + "client.pem")
+          end
+
+          context "when target mode is enabled" do
+            let(:target_mode_host) { "fluffy.kittens.org" }
+
+            before do
+              ChefConfig::Config.target_mode.enabled = true
+              ChefConfig::Config.target_mode.host = target_mode_host
+            end
+
+            it "sets the default path to the client key with the target host name" do
+              expect(ChefConfig::Config.client_key).to eq(path_to_client_key + target_mode_host + ChefConfig::PathHelper.path_separator + "client.pem")
+            end
+          end
+
+          context "when local mode is enabled" do
+            before { ChefConfig::Config[:local_mode] = true }
+
+            it "returns nil" do
+              expect(ChefConfig::Config.client_key).to be_nil
+            end
+          end
         end
 
         describe "ChefConfig::Config[:fips]" do
@@ -370,15 +400,31 @@ RSpec.describe ChefConfig::Config do
         end
 
         describe "ChefConfig::Config[:cache_path]" do
+          let(:target_mode_host) { "fluffy.kittens.org" }
+          let(:target_mode_primary_cache_path) { "#{primary_cache_path}/#{target_mode_host}" }
+          let(:target_mode_secondary_cache_path) { "#{secondary_cache_path}/#{target_mode_host}" }
+
           before do
             if is_windows
-              allow(File).to receive(:expand_path).and_return("#{ChefConfig::Config.env["SYSTEMDRIVE"]}/Path/To/Executable")
+              allow(File).to receive(:expand_path).and_return("#{system_drive}/Path/To/Executable")
             end
           end
+
           context "when /var/chef exists and is accessible" do
-            it "defaults to /var/chef" do
+            before do
               allow(ChefConfig::Config).to receive(:path_accessible?).with(to_platform("/var/chef")).and_return(true)
+            end
+
+            it "defaults to /var/chef" do
               expect(ChefConfig::Config[:cache_path]).to eq(primary_cache_path)
+            end
+
+            context "and target mode is enabled" do
+              it "cache path includes the target host name" do
+                ChefConfig::Config.target_mode.enabled = true
+                ChefConfig::Config.target_mode.host = target_mode_host
+                expect(ChefConfig::Config[:cache_path]).to eq(target_mode_primary_cache_path)
+              end
             end
           end
 
@@ -399,12 +445,22 @@ RSpec.describe ChefConfig::Config do
           end
 
           context "when /var/chef exists and is not accessible" do
-            it "defaults to $HOME/.chef" do
+            before do
               allow(File).to receive(:exists?).with(to_platform("/var/chef")).and_return(true)
               allow(File).to receive(:readable?).with(to_platform("/var/chef")).and_return(true)
               allow(File).to receive(:writable?).with(to_platform("/var/chef")).and_return(false)
+            end
 
+            it "defaults to $HOME/.chef" do
               expect(ChefConfig::Config[:cache_path]).to eq(secondary_cache_path)
+            end
+
+            context "and target mode is enabled" do
+              it "cache path defaults to $HOME/.chef with the target host name" do
+                ChefConfig::Config.target_mode.enabled = true
+                ChefConfig::Config.target_mode.host = target_mode_host
+                expect(ChefConfig::Config[:cache_path]).to eq(target_mode_secondary_cache_path)
+              end
             end
           end
 
@@ -562,7 +618,7 @@ RSpec.describe ChefConfig::Config do
         # On Windows, we'll detect an omnibus build and set this to the
         # cacert.pem included in the package, but it's nil if you're on Windows
         # w/o omnibus (e.g., doing development on Windows, custom build, etc.)
-        if !is_windows
+        unless is_windows
           it "ChefConfig::Config[:ssl_ca_file] defaults to nil" do
             expect(ChefConfig::Config[:ssl_ca_file]).to be_nil
           end
@@ -644,11 +700,11 @@ RSpec.describe ChefConfig::Config do
 
           context "when the user's home dir is /home/charlie/" do
             before do
-              ChefConfig::Config.user_home = to_platform("/home/charlie")
+              ChefConfig::Config.user_home = "/home/charlie/"
             end
 
             it "config_dir is /home/charlie/.chef/" do
-              expect(ChefConfig::Config.config_dir).to eq(ChefConfig::PathHelper.join(to_platform("/home/charlie/.chef"), ""))
+              expect(ChefConfig::Config.config_dir).to eq(ChefConfig::PathHelper.join(ChefConfig::PathHelper.cleanpath("/home/charlie/"), ".chef", ""))
             end
 
             context "and chef is running in local mode" do
@@ -657,9 +713,32 @@ RSpec.describe ChefConfig::Config do
               end
 
               it "config_dir is /home/charlie/.chef/" do
-                expect(ChefConfig::Config.config_dir).to eq(ChefConfig::PathHelper.join(to_platform("/home/charlie/.chef"), ""))
+                expect(ChefConfig::Config.config_dir).to eq(ChefConfig::PathHelper.join(ChefConfig::PathHelper.cleanpath("/home/charlie/"), ".chef", ""))
               end
             end
+          end
+
+          if is_windows
+            context "when the user's home dir is windows specific" do
+              before do
+                ChefConfig::Config.user_home = to_platform("/home/charlie/")
+              end
+
+              it "config_dir is with backslashes" do
+                expect(ChefConfig::Config.config_dir).to eq(ChefConfig::PathHelper.join(ChefConfig::PathHelper.cleanpath("/home/charlie/"), ".chef", ""))
+              end
+
+              context "and chef is running in local mode" do
+                before do
+                  ChefConfig::Config.local_mode = true
+                end
+
+                it "config_dir is with backslashes" do
+                  expect(ChefConfig::Config.config_dir).to eq(ChefConfig::PathHelper.join(ChefConfig::PathHelper.cleanpath("/home/charlie/"), ".chef", ""))
+                end
+              end
+            end
+
           end
 
         end
@@ -767,8 +846,8 @@ RSpec.describe ChefConfig::Config do
         shared_examples_for "a suitable locale" do
           it "returns an English UTF-8 locale" do
             expect(ChefConfig.logger).to_not receive(:warn).with(/Please install an English UTF-8 locale for Chef to use/)
-            expect(ChefConfig.logger).to_not receive(:debug).with(/Defaulting to locale en_US.UTF-8 on Windows/)
-            expect(ChefConfig.logger).to_not receive(:debug).with(/No usable locale -a command found/)
+            expect(ChefConfig.logger).to_not receive(:trace).with(/Defaulting to locale en_US.UTF-8 on Windows/)
+            expect(ChefConfig.logger).to_not receive(:trace).with(/No usable locale -a command found/)
             expect(ChefConfig::Config.guess_internal_locale).to eq expected_locale
           end
         end
@@ -837,9 +916,9 @@ RSpec.describe ChefConfig::Config do
 
           it "should default to 'en_US.UTF-8'" do
             if is_windows
-              expect(ChefConfig.logger).to receive(:debug).with("Defaulting to locale en_US.UTF-8 on Windows, until it matters that we do something else.")
+              expect(ChefConfig.logger).to receive(:trace).with("Defaulting to locale en_US.UTF-8 on Windows, until it matters that we do something else.")
             else
-              expect(ChefConfig.logger).to receive(:debug).with("No usable locale -a command found, assuming you have en_US.UTF-8 installed.")
+              expect(ChefConfig.logger).to receive(:trace).with("No usable locale -a command found, assuming you have en_US.UTF-8 installed.")
             end
             expect(ChefConfig::Config.guess_internal_locale).to eq "en_US.UTF-8"
           end
@@ -852,9 +931,13 @@ RSpec.describe ChefConfig::Config do
     before(:all) do
       @original_env = ENV.to_hash
       ENV["http_proxy"] = nil
+      ENV["HTTP_PROXY"] = nil
       ENV["https_proxy"] = nil
+      ENV["HTTPS_PROXY"] = nil
       ENV["ftp_proxy"] = nil
+      ENV["FTP_PROXY"] = nil
       ENV["no_proxy"] = nil
+      ENV["NO_PROXY"] = nil
     end
 
     after(:all) do
@@ -1170,10 +1253,23 @@ RSpec.describe ChefConfig::Config do
 
       end
 
-      context "for Chef Solo" do
+      context "for Chef Solo legacy mode" do
 
         before do
-          ChefConfig::Config[:solo] = true
+          ChefConfig::Config[:solo_legacy_mode] = true
+        end
+
+        it "sets the data collector server URL to nil" do
+          ChefConfig::Config[:chef_server_url] = "https://chef.example/organizations/myorg"
+          expect(ChefConfig::Config[:data_collector][:server_url]).to be_nil
+        end
+
+      end
+
+      context "for local mode" do
+
+        before do
+          ChefConfig::Config[:local_mode] = true
         end
 
         it "sets the data collector server URL to nil" do
@@ -1185,6 +1281,24 @@ RSpec.describe ChefConfig::Config do
 
     end
 
+  end
+
+  describe "validation_client_name" do
+    context "with a normal server URL" do
+      before { ChefConfig::Config[:chef_server_url] = "https://chef.example/organizations/myorg" }
+
+      it "sets the validation client to myorg-validator" do
+        expect(ChefConfig::Config[:validation_client_name]).to eq "myorg-validator"
+      end
+    end
+
+    context "with an unusual server URL" do
+      before { ChefConfig::Config[:chef_server_url] = "https://chef.example/myorg" }
+
+      it "sets the validation client to chef-validator" do
+        expect(ChefConfig::Config[:validation_client_name]).to eq "chef-validator"
+      end
+    end
   end
 
 end

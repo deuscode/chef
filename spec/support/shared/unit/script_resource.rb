@@ -41,7 +41,7 @@ shared_examples_for "a script resource" do
 
   it "should accept a string for the flags" do
     script_resource.flags "-f"
-    expect(script_resource.flags).to eql("-f")
+    expect(script_resource.flags.strip).to eql("-f")
   end
 
   it "should raise an exception if users set command on the resource", chef: ">= 13" do
@@ -66,7 +66,7 @@ shared_examples_for "a script resource" do
 
     it "inherits exactly the :cwd, :environment, :group, :path, :user, and :umask attributes from a parent resource class" do
       inherited_difference = Chef::Resource::Script.guard_inherited_attributes -
-        [:cwd, :environment, :group, :path, :user, :umask ]
+        %i{cwd environment group path user umask}
 
       expect(inherited_difference).to eq([])
     end

@@ -24,7 +24,7 @@ require "chef/chef_fs/file_system_cache"
 
 module KnifeSupport
   DEBUG = ENV["DEBUG"]
-  def knife(*args, input: nil)
+  def knife(*args, input: nil, instance_filter: nil)
     # Allow knife('role from file roles/blah.json') rather than requiring the
     # arguments to be split like knife('role', 'from', 'file', 'roles/blah.json')
     # If any argument will have actual spaces in it, the long form is required.
@@ -40,8 +40,8 @@ module KnifeSupport
     # Work on machines where we can't access /var
     Dir.mktmpdir("checksums") do |checksums_cache_dir|
       Chef::Config[:cache_options] = {
-        :path => checksums_cache_dir,
-        :skip_expires => true,
+        path: checksums_cache_dir,
+        skip_expires: true,
       }
 
       # This is Chef::Knife.run without load_commands--we'll load stuff
@@ -58,7 +58,7 @@ module KnifeSupport
       old_loggers = Chef::Log.loggers
       old_log_level = Chef::Log.level
       begin
-        puts "knife: #{args.join(' ')}" if DEBUG
+        puts "knife: #{args.join(" ")}" if DEBUG
         subcommand_class = Chef::Knife.subcommand_class_from(args)
         subcommand_class.options = Chef::Application::Knife.options.merge(subcommand_class.options)
         subcommand_class.load_deps
@@ -83,9 +83,20 @@ module KnifeSupport
         # running test scenarios against a real chef server. If things don't
         # smell right, abort.
 
+        # To ensure that we don't pick up a user's credentials file we lie through our teeth about
+        # it's existence.
+        allow(File).to receive(:file?).and_call_original
+        allow(File).to receive(:file?).with(File.expand_path("~/.chef/credentials")).and_return(false)
+
+        # Set a canary that is modified by the default null_config.rb config file.
         $__KNIFE_INTEGRATION_FAILSAFE_CHECK = "ole"
+
+        # Allow tweaking the knife instance before configuration.
+        instance_filter.call(instance) if instance_filter
+
         instance.configure_chef
 
+        # The canary is incorrect, meaning the normal null_config.rb didn't run. Something is wrong.
         unless $__KNIFE_INTEGRATION_FAILSAFE_CHECK == "ole ole"
           raise Exception, "Potential misconfiguration of integration tests detected. Aborting test."
         end
@@ -139,7 +150,7 @@ module KnifeSupport
           expected[:stderr] = arg
         end
       end
-      expected[:exit_code] = 1 if !expected[:exit_code]
+      expected[:exit_code] = 1 unless expected[:exit_code]
       should_result_in(expected)
     end
 
@@ -158,9 +169,9 @@ module KnifeSupport
     private
 
     def should_result_in(expected)
-      expected[:stdout] = "" if !expected[:stdout]
-      expected[:stderr] = "" if !expected[:stderr]
-      expected[:exit_code] = 0 if !expected[:exit_code]
+      expected[:stdout] = "" unless expected[:stdout]
+      expected[:stderr] = "" unless expected[:stderr]
+      expected[:exit_code] = 0 unless expected[:exit_code]
       # TODO make this go away
       stderr_actual = @stderr.sub(/^WARNING: No knife configuration file found\n/, "")
 

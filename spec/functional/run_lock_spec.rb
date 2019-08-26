@@ -21,7 +21,7 @@ require "chef/client"
 describe Chef::RunLock do
 
   # This behavior works on windows, but the tests use fork :(
-  describe "when locking the chef-client run", :unix_only => true do
+  describe "when locking the chef-client run", unix_only: true do
 
     ##
     # Lockfile location and helpers
@@ -150,7 +150,7 @@ describe Chef::RunLock do
           end
         end
 
-        it "sets FD_CLOEXEC on the lockfile", :supports_cloexec => true do
+        it "sets FD_CLOEXEC on the lockfile", supports_cloexec: true do
           run_lock = File.open(lockfile)
           expect(run_lock.fcntl(Fcntl::F_GETFD, 0) & Fcntl::FD_CLOEXEC).to eq(Fcntl::FD_CLOEXEC)
         end
@@ -197,7 +197,7 @@ describe Chef::RunLock do
           end
         end
 
-        it "sets FD_CLOEXEC on the lockfile", :supports_cloexec => true do
+        it "sets FD_CLOEXEC on the lockfile", supports_cloexec: true do
           run_lock = File.open(lockfile)
           expect(run_lock.fcntl(Fcntl::F_GETFD, 0) & Fcntl::FD_CLOEXEC).to eq(Fcntl::FD_CLOEXEC)
         end
@@ -334,6 +334,7 @@ describe Chef::RunLock do
       loop do
         line = readline_nonblock(read_from_process)
         break if line.nil?
+
         event, time = line.split("@")
         example.log_event("#{name}.last_event got #{event}")
         example.log_event("[#{name}] #{event}", time.strip)
@@ -346,7 +347,7 @@ describe Chef::RunLock do
       example.log_event("#{name}.run_to(#{to_event.inspect})")
 
       # Start the process if it's not started
-      start if !pid
+      start unless pid
 
       # Tell the process what to stop at (also means it can go)
       write_to_process.print "#{to_event}\n"
@@ -370,7 +371,7 @@ describe Chef::RunLock do
     def run_to_completion
       example.log_event("#{name}.run_to_completion")
       # Start the process if it's not started
-      start if !pid
+      start unless pid
 
       # Tell the process to stop at nothing (no blocking)
       @write_to_process.print "nothing\n"
@@ -461,7 +462,7 @@ describe Chef::RunLock do
       buffer << fd.read_nonblock(1) while buffer[-1] != "\n"
 
       buffer
-    #rescue IO::EAGAINUnreadable
+    # rescue IO::EAGAINUnreadable
     rescue IO::WaitReadable
       unless buffer == ""
         sleep 0.1

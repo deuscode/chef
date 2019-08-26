@@ -16,9 +16,9 @@
 # limitations under the License.
 #
 
-require "chef/exceptions"
-require "chef/guard_interpreter"
-require "chef/mixin/descendants_tracker"
+require_relative "../../exceptions"
+require_relative "../../guard_interpreter"
+require_relative "../../mixin/descendants_tracker"
 
 class Chef
   class Resource
@@ -77,7 +77,12 @@ class Chef
           if c.nil?
             raise Chef::Exceptions::VerificationNotFound.new "No file verification for #{name} found."
           end
+
           c
+        end
+
+        def logger
+          @parent_resource.logger
         end
 
         def initialize(parent_resource, command, opts, &block)
@@ -87,7 +92,7 @@ class Chef
         end
 
         def verify(path, opts = {})
-          Chef::Log.debug("Running verification[#{self}] on #{path}")
+          logger.trace("Running verification[#{self}] on #{path}")
           if @block
             verify_block(path, opts)
           elsif @command.is_a?(Symbol)
@@ -109,7 +114,8 @@ class Chef
           if @command.include?("%{file}")
             raise ArgumentError, "The %{file} expansion for verify commands has been removed. Please use %{path} instead."
           end
-          command = @command % { :path => path }
+
+          command = @command % { path: path }
           interpreter = Chef::GuardInterpreter.for_resource(@parent_resource, command, @command_opts)
           interpreter.evaluate
         end
@@ -118,6 +124,16 @@ class Chef
           verification_class = Chef::Resource::File::Verification.lookup(@command)
           v = verification_class.new(@parent_resource, @command, @command_opts, &@block)
           v.verify(path, opts)
+        end
+
+        def to_s
+          if @block
+            "<Proc>"
+          elsif @command.is_a?(Symbol)
+            "#{@command.inspect} (#{Chef::Resource::File::Verification.lookup(@command).name})"
+          elsif @command.is_a?(String)
+            @command
+          end
         end
       end
     end

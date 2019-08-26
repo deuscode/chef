@@ -16,17 +16,23 @@
 # limitations under the License.
 #
 
-require "chef/resource"
+require_relative "../resource"
 
 class Chef
   class Resource
     class AptUpdate < Chef::Resource
       resource_name :apt_update
-      provides :apt_update
+      provides(:apt_update) { true }
+
+      description "Use the apt_update resource to manage APT repository updates on Debian and Ubuntu platforms."
+      introduced "12.7"
 
       # allow bare apt_update with no name
       property :name, String, default: ""
-      property :frequency, Integer, default: 86_400
+
+      property :frequency, Integer,
+        description: "Determines how frequently (in seconds) APT repository updates are made. Use this property when the :periodic action is specified.",
+        default: 86_400
 
       default_action :periodic
       allowed_actions :update, :periodic

@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-require "chef/mixin/shell_out"
-require "chef/mixin/windows_architecture_helper"
+require_relative "shell_out"
+require_relative "windows_architecture_helper"
 
 class Chef
   module Mixin
@@ -74,7 +74,7 @@ class Chef
       # Helper to build a powershell command around the script to run.
       #
       # @param script [String] script to run
-      # @retrurn [String] powershell command to execute
+      # @return [String] powershell command to execute
       def build_powershell_command(script)
         flags = [
           # Hides the copyright banner at startup.
@@ -86,12 +86,12 @@ class Chef
           # always set the ExecutionPolicy flag
           # see http://technet.microsoft.com/en-us/library/ee176961.aspx
           "-ExecutionPolicy Unrestricted",
-          # Powershell will hang if STDIN is redirected
+          # PowerShell will hang if STDIN is redirected
           # http://connect.microsoft.com/PowerShell/feedback/details/572313/powershell-exe-can-hang-if-stdin-is-redirected
           "-InputFormat None",
         ]
 
-        "powershell.exe #{flags.join(' ')} -Command \"#{script.gsub('"', '\"')}\""
+        "powershell.exe #{flags.join(" ")} -Command \"#{script.gsub('"', '\"')}\""
       end
     end
   end

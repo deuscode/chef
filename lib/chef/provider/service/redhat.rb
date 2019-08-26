@@ -16,7 +16,7 @@
 # limitations under the License.
 #
 
-require "chef/provider/service/init"
+require_relative "init"
 
 class Chef
   class Provider
@@ -32,8 +32,8 @@ class Chef
           Chef::Platform::ServiceHelpers.service_resource_providers.include?(:redhat)
         end
 
-        CHKCONFIG_ON = /\d:on/
-        CHKCONFIG_MISSING = /No such/
+        CHKCONFIG_ON = /\d:on/.freeze
+        CHKCONFIG_MISSING = /No such/.freeze
 
         def self.supports?(resource, action)
           Chef::Platform::ServiceHelpers.config_for_service(resource.service_name).include?(:initd)
@@ -81,7 +81,7 @@ class Chef
           super
 
           if ::File.exists?("/sbin/chkconfig")
-            chkconfig = shell_out!("/sbin/chkconfig --list #{current_resource.service_name}", :returns => [0, 1])
+            chkconfig = shell_out!("/sbin/chkconfig --list #{current_resource.service_name}", returns: [0, 1])
             unless run_levels.nil? || run_levels.empty?
               all_levels_match = true
               chkconfig.stdout.split(/\s+/)[1..-1].each do |level|
@@ -106,13 +106,13 @@ class Chef
 
         # @api private
         def levels
-          (run_levels.nil? || run_levels.empty?) ? "" : "--level #{run_levels.join('')} "
+          (run_levels.nil? || run_levels.empty?) ? "" : "--level #{run_levels.join("")} "
         end
 
         def enable_service
           unless run_levels.nil? || run_levels.empty?
             disable_levels = current_run_levels - run_levels
-            shell_out! "/sbin/chkconfig --level #{disable_levels.join('')} #{new_resource.service_name} off" unless disable_levels.empty?
+            shell_out! "/sbin/chkconfig --level #{disable_levels.join("")} #{new_resource.service_name} off" unless disable_levels.empty?
           end
           shell_out! "/sbin/chkconfig #{levels}#{new_resource.service_name} on"
         end

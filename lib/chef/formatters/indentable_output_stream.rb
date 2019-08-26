@@ -24,9 +24,12 @@ class Chef
         end
       end
 
-      # Print text.  This will start a new line and indent if necessary
+      # Print text. This will start a new line and indent if necessary
       # but will not terminate the line (future print and puts statements
       # will start off where this print left off).
+      #
+      # @param string [String]
+      # @param args [Array<Hash,Symbol>]
       def color(string, *args)
         print(string, from_args(args))
       end
@@ -34,20 +37,29 @@ class Chef
       # Print the start of a new line.  This will terminate any existing lines and
       # cause indentation but will not move to the next line yet (future 'print'
       # and 'puts' statements will stay on this line).
+      #
+      # @param string [String]
+      # @param args [Array<Hash,Symbol>]
       def start_line(string, *args)
-        print(string, from_args(args, :start_line => true))
+        print(string, from_args(args, start_line: true))
       end
 
       # Print a line.  This will continue from the last start_line or print,
       # or start a new line and indent if necessary.
+      #
+      # @param string [String]
+      # @param args [Array<Hash,Symbol>]
       def puts(string, *args)
-        print(string, from_args(args, :end_line => true))
+        print(string, from_args(args, end_line: true))
       end
 
       # Print an entire line from start to end.  This will terminate any existing
       # lines and cause indentation.
+      #
+      # @param string [String]
+      # @param args [Array<Hash,Symbol>]
       def puts_line(string, *args)
-        print(string, from_args(args, :start_line => true, :end_line => true))
+        print(string, from_args(args, start_line: true, end_line: true))
       end
 
       # Print a raw chunk
@@ -100,10 +112,10 @@ class Chef
       end
 
       def from_args(colors, merge_options = {})
-        if colors.size == 1 && colors[0].kind_of?(Hash)
+        if colors.size == 1 && colors[0].is_a?(Hash)
           merge_options.merge(colors[0])
         else
-          merge_options.merge({ :colors => colors })
+          merge_options.merge({ colors: colors })
         end
       end
 
@@ -142,14 +154,14 @@ class Chef
       end
 
       def indent_line(options)
-        if !@line_started
+        unless @line_started
 
           # Print indents.  If there is a stream name, either print it (if we're
           # switching streams) or print enough blanks to match
           # the indents.
           if options[:name]
             if @current_stream != options[:stream]
-              @out.print "#{(' ' * indent)}[#{options[:name]}] "
+              @out.print "#{(" " * indent)}[#{options[:name]}] "
             else
               @out.print " " * (indent + 3 + options[:name].size)
             end

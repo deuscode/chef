@@ -16,14 +16,16 @@
 # limitations under the License.
 #
 
-require "chef/resource/package"
-require "chef/provider/package/smartos"
+require_relative "package"
 
 class Chef
   class Resource
     class SmartosPackage < Chef::Resource::Package
       resource_name :smartos_package
-      provides :package, os: "solaris2", platform_family: "smartos"
+      provides :smartos_package
+      provides :package, platform_family: "smartos"
+
+      description "Use the smartos_package resource to manage packages for the SmartOS platform."
     end
   end
 end

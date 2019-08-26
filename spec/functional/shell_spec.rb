@@ -1,6 +1,6 @@
 #
 # Author:: Daniel DeLeo (<dan@chef.io>)
-# Copyright:: Copyright 2012-2017, Chef Software Inc.
+# Copyright:: Copyright 2012-2019, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,7 +26,7 @@ describe Shell do
   # chef-shell's unit tests are by necessity very mock-heavy, and frequently do
   # not catch cases where chef-shell fails to boot because of changes in
   # chef/client.rb
-  describe "smoke tests", :unix_only => true do
+  describe "smoke tests", unix_only: true do
 
     TIMEOUT = 300
 
@@ -82,8 +82,7 @@ describe Shell do
 
       require "pty"
       config = File.expand_path("shef-config.rb", CHEF_SPEC_DATA)
-      path_to_chef_shell = File.expand_path("../../../bin/chef-shell", __FILE__)
-      reader, writer, pid = PTY.spawn("#{path_to_chef_shell} -c #{config} #{options}")
+      reader, writer, pid = PTY.spawn("bundle exec chef-shell -c #{config} #{options}")
       read_until(reader, "chef (#{Chef::VERSION})>")
       yield reader, writer if block_given?
       writer.puts('"done"')

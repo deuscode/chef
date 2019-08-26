@@ -19,9 +19,9 @@
 # limitations under the License.
 #
 
-require "chef/resource/package"
-require "chef/provider/package/openbsd"
-require "chef/mixin/shell_out"
+require_relative "package"
+require_relative "../provider/package/openbsd"
+require_relative "../mixin/shell_out"
 
 class Chef
   class Resource
@@ -30,6 +30,9 @@ class Chef
 
       resource_name :openbsd_package
       provides :package, os: "openbsd"
+
+      description "Use the openbsd_package resource to manage packages for the OpenBSD platform."
+      introduced "12.1"
     end
   end
 end

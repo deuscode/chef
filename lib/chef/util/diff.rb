@@ -58,13 +58,14 @@ class Chef
       def for_reporting
         # caller needs to ensure that new files aren't posted to resource reporting
         return nil if @diff.nil?
+
         @diff.join("\\n")
       end
 
       def use_tempfile_if_missing(file)
         tempfile = nil
         unless File.exists?(file)
-          Chef::Log.debug("File #{file} does not exist to diff against, using empty tempfile")
+          Chef::Log.trace("File #{file} does not exist to diff against, using empty tempfile")
           tempfile = Tempfile.new("chef-diff")
           file = tempfile.path
         end
@@ -89,8 +90,8 @@ class Chef
         diff_str = ""
         file_length_difference = 0
 
-        old_data = IO.readlines(old_file).map { |e| e.chomp }
-        new_data = IO.readlines(new_file).map { |e| e.chomp }
+        old_data = IO.readlines(old_file).map(&:chomp)
+        new_data = IO.readlines(new_file).map(&:chomp)
         diff_data = ::Diff::LCS.diff(old_data, new_data)
 
         return diff_str if old_data.empty? && new_data.empty?
@@ -111,6 +112,7 @@ class Chef
             file_length_difference = hunk.file_length_difference
             next unless old_hunk
             next if hunk.merge(old_hunk)
+
             diff_str << old_hunk.diff(:unified) << "\n"
           ensure
             old_hunk = hunk
@@ -139,7 +141,7 @@ class Chef
         return "(new content is binary, diff output suppressed)" if is_binary?(new_file)
 
         begin
-          Chef::Log.debug("Running: diff -u #{old_file} #{new_file}")
+          Chef::Log.trace("Running: diff -u #{old_file} #{new_file}")
           diff_str = udiff(old_file, new_file)
 
         rescue Exception => e
@@ -170,13 +172,14 @@ class Chef
             return buff !~ /\A[\s[:print:]]*\z/m
           rescue ArgumentError => e
             return true if e.message =~ /invalid byte sequence/
+
             raise
           end
         end
       end
 
       def encode_diff_for_json(diff_str)
-        diff_str.encode!("UTF-8", :invalid => :replace, :undef => :replace, :replace => "?")
+        diff_str.encode!("UTF-8", invalid: :replace, undef: :replace, replace: "?")
       end
 
     end

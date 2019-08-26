@@ -16,7 +16,7 @@
 # limitations under the License.
 #
 
-require "chef/chef_fs/file_system/base_fs_dir"
+require_relative "../base_fs_dir"
 
 class Chef
   module ChefFS
@@ -39,7 +39,7 @@ class Chef
 
           def can_have_child?(name, is_dir)
             if is_dir
-              return false if !@recursive
+              return false unless @recursive
             else
               return false if @ruby_only && name !~ /\.rb$/
             end

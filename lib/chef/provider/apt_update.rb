@@ -1,6 +1,6 @@
 #
 # Author:: Thom May (<thom@chef.io>)
-# Copyright:: Copyright (c) 2016-2017, Chef Software Inc.
+# Copyright:: Copyright (c) 2016-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,27 +16,22 @@
 # limitations under the License.
 #
 
-require "chef/provider"
-require "chef/provider/noop"
-require "chef/mixin/which"
+require_relative "../provider"
+require_relative "noop"
+require_relative "../dsl/declare_resource"
 
 class Chef
   class Provider
     class AptUpdate < Chef::Provider
-      extend Chef::Mixin::Which
+      provides :apt_update, platform_family: "debian"
 
-      provides :apt_update do
-        which("apt-get")
-      end
+      APT_CONF_DIR = "/etc/apt/apt.conf.d".freeze
+      STAMP_DIR = "/var/lib/apt/periodic".freeze
 
-      APT_CONF_DIR = "/etc/apt/apt.conf.d"
-      STAMP_DIR = "/var/lib/apt/periodic"
-
-      def load_current_resource
-      end
+      def load_current_resource; end
 
       action :periodic do
-        if !apt_up_to_date?
+        unless apt_up_to_date?
           converge_by "update new lists of packages" do
             do_update
           end
@@ -71,7 +66,10 @@ class Chef
           action :create_if_missing
         end
 
-        declare_resource(:execute, "apt-get -q update")
+        declare_resource(:execute, "apt-get -q update") do
+          command [ "apt-get", "-q", "update" ]
+          default_env true
+        end
       end
 
     end

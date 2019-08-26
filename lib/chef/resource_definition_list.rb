@@ -16,8 +16,8 @@
 # limitations under the License.
 #
 
-require "chef/mixin/from_file"
-require "chef/resource_definition"
+require_relative "mixin/from_file"
+require_relative "resource_definition"
 
 class Chef
   class ResourceDefinitionList
@@ -26,7 +26,7 @@ class Chef
     attr_accessor :defines
 
     def initialize
-      @defines = Hash.new
+      @defines = {}
     end
 
     def define(resource_name, prototype_params = nil, &block)

@@ -16,8 +16,8 @@
 # limitations under the License.
 #
 
-require "chef/provider/ifconfig"
-require "chef/util/file_edit"
+require_relative "../ifconfig"
+require_relative "../../util/file_edit"
 
 class Chef
   class Provider
@@ -36,11 +36,11 @@ class Chef
 <% if new_resource.onboot == "yes" %>auto <%= new_resource.device %><% end %>
 <% case new_resource.bootproto
    when "dhcp" %>
-iface <%= new_resource.device %> inet dhcp
+iface <%= new_resource.device %> <%= new_resource.family %> dhcp
 <% when "bootp" %>
-iface <%= new_resource.device %> inet bootp
+iface <%= new_resource.device %> <%= new_resource.family %> bootp
 <% else %>
-iface <%= new_resource.device %> inet static
+iface <%= new_resource.device %> <%= new_resource.family %> static
     <% if new_resource.target %>address <%= new_resource.target %><% end %>
     <% if new_resource.mask %>netmask <%= new_resource.mask %><% end %>
     <% if new_resource.network %>network <%= new_resource.network %><% end %>
@@ -48,6 +48,7 @@ iface <%= new_resource.device %> inet static
     <% if new_resource.metric %>metric <%= new_resource.metric %><% end %>
     <% if new_resource.hwaddr %>hwaddress <%= new_resource.hwaddr %><% end %>
     <% if new_resource.mtu %>mtu <%= new_resource.mtu %><% end %>
+    <% if new_resource.gateway %>gateway <%= new_resource.gateway %><% end %>
 <% end %>
 <% end %>
           }
@@ -62,6 +63,9 @@ iface <%= new_resource.device %> inet static
         protected
 
         def enforce_interfaces_dot_d_sanity
+          # on ubuntu 18.04 there's no interfaces file and it uses interfaces.d by default
+          return if ::File.directory?(INTERFACES_DOT_D_DIR) && !::File.exist?(INTERFACES_FILE)
+
           # create /etc/network/interfaces.d via dir resource (to get reporting, etc)
           dir = Chef::Resource::Directory.new(INTERFACES_DOT_D_DIR, run_context)
           dir.run_action(:create)

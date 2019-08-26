@@ -16,26 +16,27 @@
 # limitations under the License.
 #
 
-require "chef/knife"
-require "chef/util/path_helper"
+require_relative "../knife"
+require_relative "../util/path_helper"
+require_relative "../dist"
 
 class Chef::Knife::Exec < Chef::Knife
 
   banner "knife exec [SCRIPT] (options)"
 
   option :exec,
-    :short => "-E CODE",
-    :long => "--exec CODE",
-    :description => "a string of Chef code to execute"
+    short: "-E CODE",
+    long: "--exec CODE",
+    description: "A string of #{Chef::Dist::PRODUCT} code to execute."
 
   option :script_path,
-    :short => "-p PATH:PATH",
-    :long => "--script-path PATH:PATH",
-    :description => "A colon-separated path to look for scripts in",
-    :proc => lambda { |o| o.split(":") }
+    short: "-p PATH:PATH",
+    long: "--script-path PATH:PATH",
+    description: "A colon-separated path to look for scripts in.",
+    proc: lambda { |o| o.split(":") }
 
   deps do
-    require "chef/shell/ext"
+    require_relative "../shell/ext"
   end
 
   def run
@@ -68,15 +69,15 @@ class Chef::Knife::Exec < Chef::Knife
 
     # Failing that, try searching the script path. If we can't find
     # anything, fail gracefully.
-    Chef::Log.debug("Searching script_path: #{config[:script_path].inspect}")
+    Chef::Log.trace("Searching script_path: #{config[:script_path].inspect}")
 
     config[:script_path].each do |path|
       path = File.expand_path(path)
       test = File.join(path, x)
-      Chef::Log.debug("Testing: #{test}")
+      Chef::Log.trace("Testing: #{test}")
       if File.exists?(test)
         script = test
-        Chef::Log.debug("Found: #{test}")
+        Chef::Log.trace("Found: #{test}")
         return script
       end
     end

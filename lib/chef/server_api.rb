@@ -16,22 +16,25 @@
 # limitations under the License.
 #
 
-require "chef/http"
-require "chef/http/authenticator"
-require "chef/http/cookie_manager"
-require "chef/http/decompressor"
-require "chef/http/json_input"
-require "chef/http/json_output"
-require "chef/http/remote_request_id"
-require "chef/http/validate_content_length"
-require "chef/http/api_versions"
+require_relative "http"
+require_relative "http/authenticator"
+require_relative "http/cookie_manager"
+require_relative "http/decompressor"
+require_relative "http/json_input"
+require_relative "http/json_output"
+require_relative "http/remote_request_id"
+require_relative "http/validate_content_length"
+require_relative "http/api_versions"
 
 class Chef
   class ServerAPI < Chef::HTTP
 
     def initialize(url = Chef::Config[:chef_server_url], options = {})
+      # # If making a change here, also update Chef::Knife::Raw::RawInputServerAPI.
       options[:client_name] ||= Chef::Config[:node_name]
+      options[:raw_key] ||= Chef::Config[:client_key_contents]
       options[:signing_key_filename] ||= Chef::Config[:client_key] unless options[:raw_key]
+      options[:ssh_agent_signing] ||= Chef::Config[:ssh_agent_signing]
       options[:signing_key_filename] = nil if chef_zero_uri?(url)
       options[:inflate_json_class] = false
       super(url, options)
@@ -77,4 +80,4 @@ class Chef
   end
 end
 
-require "chef/config"
+require_relative "config"

@@ -20,13 +20,13 @@
 # The contents of msu file are extracted, which contains one or more cab files.
 # The extracted cab files are installed using Chef::Resource::Package::CabPackage
 # Reference: https://support.microsoft.com/en-in/kb/934307
-require "chef/provider/package"
-require "chef/resource/msu_package"
-require "chef/mixin/shell_out"
-require "chef/provider/package/cab"
-require "chef/util/path_helper"
-require "chef/mixin/uris"
-require "chef/mixin/checksum"
+require_relative "../package"
+require_relative "../../resource/msu_package"
+require_relative "../../mixin/shell_out"
+require_relative "cab"
+require_relative "../../util/path_helper"
+require_relative "../../mixin/uris"
+require_relative "../../mixin/checksum"
 
 class Chef
   class Provider
@@ -36,7 +36,7 @@ class Chef
         include Chef::Mixin::Uris
         include Chef::Mixin::Checksum
 
-        provides :msu_package, os: "windows"
+        provides :msu_package
 
         def load_current_resource
           @current_resource = Chef::Resource::MsuPackage.new(new_resource.name)
@@ -54,6 +54,7 @@ class Chef
           else
             current_resource.version(get_current_versions)
           end
+
           current_resource
         end
 
@@ -83,7 +84,7 @@ class Chef
 
         def download_source_file
           source_resource.run_action(:create)
-          Chef::Log.debug("#{new_resource} fetched source file to #{source_resource.path}")
+          logger.trace("#{new_resource} fetched source file to #{source_resource.path}")
           source_resource.path
         end
 
@@ -125,7 +126,7 @@ class Chef
 
         def extract_msu_contents(msu_file, destination)
           with_os_architecture(nil) do
-            shell_out_with_timeout!("#{ENV['SYSTEMROOT']}\\system32\\expand.exe -f:* #{msu_file} #{destination}")
+            shell_out!("#{ENV["SYSTEMROOT"]}\\system32\\expand.exe -f:* #{msu_file} #{destination}")
           end
         end
 
@@ -148,6 +149,7 @@ class Chef
 
             cab_files
           end
+
           cab_files
         end
 

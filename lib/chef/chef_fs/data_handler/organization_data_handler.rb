@@ -1,4 +1,4 @@
-require "chef/chef_fs/data_handler/data_handler_base"
+require_relative "data_handler_base"
 
 class Chef
   module ChefFS
@@ -27,7 +27,7 @@ class Chef
         # @yieldparam [s<string>] error message
         def verify_integrity(object, entry)
           if entry.org != object["name"]
-            yield("Name must be '#{entry.org}' (is '#{object['name']}')")
+            yield("Name must be '#{entry.org}' (is '#{object["name"]}')")
           end
         end
       end

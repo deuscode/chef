@@ -21,7 +21,7 @@ require "tiny_server"
 
 describe Chef::Knife::Exec do
   before(:each) do
-    @server = TinyServer::Manager.new #(:debug => true)
+    @server = TinyServer::Manager.new # (:debug => true)
     @server.start
   end
 
@@ -49,7 +49,7 @@ describe Chef::Knife::Exec do
     code = "$output.puts nodes.all"
     @knife.config[:exec] = code
     @knife.run
-    expect($output.string).to match(%r{node\[ohai-world\]})
+    expect($output.string).to match(/node\[ohai-world\]/)
   end
 
 end

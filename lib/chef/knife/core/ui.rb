@@ -18,15 +18,14 @@
 # limitations under the License.
 #
 
-require "forwardable"
-require "chef/platform/query_helpers"
-require "chef/knife/core/generic_presenter"
-require "tempfile"
+require "forwardable" unless defined?(Forwardable)
+require_relative "../../platform/query_helpers"
+require_relative "generic_presenter"
+require "tempfile" unless defined?(Tempfile)
 
 class Chef
   class Knife
 
-    #==Chef::Knife::UI
     # The User Interaction class used by knife.
     class UI
 
@@ -64,37 +63,73 @@ class Chef
 
       # Prints a message to stdout. Aliased as +info+ for compatibility with
       # the logger API.
+      #
+      # @param message [String] the text string
       def msg(message)
         stdout.puts message
       rescue Errno::EPIPE => e
         raise e if @config[:verbosity] >= 2
+
         exit 0
       end
 
       # Prints a msg to stderr. Used for info, warn, error, and fatal.
+      #
+      # @param message [String] the text string
       def log(message)
-        stderr.puts message
+        lines = message.split("\n")
+        first_line = lines.shift
+        stderr.puts first_line
+        # If the message is multiple lines,
+        # indent subsequent lines to align with the
+        # log type prefix ("ERROR: ", etc)
+        unless lines.empty?
+          prefix, = first_line.split(":", 2)
+          return if prefix.nil?
+
+          prefix_len = prefix.length
+          prefix_len -= 9 if color? # prefix includes 9 bytes of color escape sequences
+          prefix_len += 2 # include room to align to the ": " following PREFIX
+          padding = " " * prefix_len
+          lines.each do |line|
+            stderr.puts "#{padding}#{line}"
+          end
+        end
       rescue Errno::EPIPE => e
         raise e if @config[:verbosity] >= 2
+
         exit 0
       end
 
       alias :info :log
       alias :err :log
 
+      # Print a Debug
+      #
+      # @param message [String] the text string
+      def debug(message)
+        log("#{color("DEBUG:", :blue, :bold)} #{message}")
+      end
+
       # Print a warning message
+      #
+      # @param message [String] the text string
       def warn(message)
-        log("#{color('WARNING:', :yellow, :bold)} #{message}")
+        log("#{color("WARNING:", :yellow, :bold)} #{message}")
       end
 
       # Print an error message
+      #
+      # @param message [String] the text string
       def error(message)
-        log("#{color('ERROR:', :red, :bold)} #{message}")
+        log("#{color("ERROR:", :red, :bold)} #{message}")
       end
 
       # Print a message describing a fatal error.
+      #
+      # @param message [String] the text string
       def fatal(message)
-        log("#{color('FATAL:', :red, :bold)} #{message}")
+        log("#{color("FATAL:", :red, :bold)} #{message}")
       end
 
       def color(string, *colors)
@@ -154,6 +189,7 @@ class Chef
         stdout.puts data
       rescue Errno::EPIPE => e
         raise e if @config[:verbosity] >= 2
+
         exit 0
       end
 
@@ -167,12 +203,12 @@ class Chef
 
       def edit_data(data, parse_output = true, object_class: nil)
         output = Chef::JSONCompat.to_json_pretty(data)
-        if !config[:disable_editing]
+        unless config[:disable_editing]
           Tempfile.open([ "knife-edit-", ".json" ]) do |tf|
             tf.sync = true
             tf.puts output
             tf.close
-            raise "Please set EDITOR environment variable" unless system("#{config[:editor]} #{tf.path}")
+            raise "Please set EDITOR environment variable. See https://docs.chef.io/knife_setup.html for details." unless system("#{config[:editor]} #{tf.path}")
 
             output = IO.read(tf.path)
           end

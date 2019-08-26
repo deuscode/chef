@@ -19,7 +19,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-require "chef/log"
+require_relative "log"
 require "chef-config/logger"
 
 # DI our logger into ChefConfig before we load the config. Some defaults are
@@ -28,7 +28,7 @@ require "chef-config/logger"
 ChefConfig.logger = Chef::Log
 
 require "chef-config/config"
-require "chef/platform/query_helpers"
+require_relative "platform/query_helpers"
 
 # Ohai::Config defines its own log_level and log_location. When loaded, it will
 # override the default ChefConfig::Config values. We save them here before
@@ -55,8 +55,7 @@ class Chef
 
     default :event_loggers do
       evt_loggers = []
-      if ChefConfig.windows? && !(Chef::Platform.windows_server_2003? ||
-          Chef::Platform.windows_nano_server?)
+      if ChefConfig.windows? && !Chef::Platform.windows_nano_server?
         evt_loggers << :win_evt
       end
       evt_loggers
@@ -75,7 +74,7 @@ class Chef
     # by redefining the config_attr_writer to not warn for these options.
     #
     # REMOVEME once the warnings for these configurables are removed from Ohai.
-    [ :log_level, :log_location ].each do |option|
+    %i{log_level log_location}.each do |option|
       config_attr_writer option do |value|
         value
       end

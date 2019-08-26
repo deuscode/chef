@@ -19,11 +19,9 @@
 class Chef
   module Mixin
     module ApiVersionRequestHandling
-      # Input:
-      # exeception:
-      #   Net::HTTPServerException that may or may not contain the x-ops-server-api-version header
+      # @param exeception [Net::HTTPClientException] may or may not contain the x-ops-server-api-version header
       # supported_client_versions:
-      #  An array of Integers that represent the API versions the client supports.
+      # @param supported_client_versions [Array<Integer>] The API versions the client supports.
       #
       # Output:
       # nil:
@@ -37,7 +35,7 @@ class Chef
         return nil if exception.response.code != "406" || exception.response["x-ops-server-api-version"].nil?
 
         # intersection of versions the server and client support, will be of length zero if no intersection
-        server_supported_client_versions = Array.new
+        server_supported_client_versions = []
 
         header = Chef::JSONCompat.from_json(exception.response["x-ops-server-api-version"])
         min_server_version = Integer(header["min_version"])
@@ -52,13 +50,13 @@ class Chef
       end
 
       def reregister_only_v0_supported_error_msg(max_version, min_version)
-        <<-EOH
-The reregister command only supports server API version 0.
-The server that received the request supports a min version of #{min_version} and a max version of #{max_version}.
-User keys are now managed via the key rotation commmands.
-Please refer to the documentation on how to manage your keys via the key rotation commands:
-https://docs.chef.io/server_security.html#key-rotation
-EOH
+        <<~EOH
+          The reregister command only supports server API version 0.
+          The server that received the request supports a min version of #{min_version} and a max version of #{max_version}.
+          User keys are now managed via the key rotation commmands.
+          Please refer to the documentation on how to manage your keys via the key rotation commands:
+          https://docs.chef.io/server_security.html#key-rotation
+        EOH
       end
 
     end

@@ -7,17 +7,29 @@ source "https://rubygems.org"
 # of bundler versions prior to 1.12.0 (https://github.com/bundler/bundler/commit/193a14fe5e0d56294c7b370a0e59f93b2c216eed)
 gem "chef", path: "."
 
-gem "ohai", "~> 13"
+# necessary until we release ohai 15
+gem "ohai", git: "https://github.com/chef/ohai.git", branch: "master"
 
 gem "chef-config", path: File.expand_path("../chef-config", __FILE__) if File.exist?(File.expand_path("../chef-config", __FILE__))
-gem "cheffish", "~> 13" # required for rspec tests
+
+if File.exist?(File.expand_path("../chef-bin", __FILE__))
+  # bundling in a git checkout
+  gem "chef-bin", path: File.expand_path("../chef-bin", __FILE__)
+else
+  # bundling in omnibus
+  gem "chef-bin" # rubocop:disable Bundler/DuplicatedGem
+end
+
+gem "cheffish", "~> 14"
 
 group(:omnibus_package) do
   gem "appbundler"
   gem "rb-readline"
-  gem "inspec"
-  # nokogiri has no ruby-2.4 version for windows so it cannot go into our Gemfile.lock
-  #  gem "nokogiri", ">= 1.7.1"
+  gem "inspec-core", "~> 4.3"
+  gem "inspec-core-bin", "~> 4.3" # need to provide the binaries for inspec
+  gem "chef-vault"
+  gem "ed25519" # ed25519 ssh key support done here as it's a native gem we can't put in train
+  gem "bcrypt_pbkdf" # ed25519 ssh key support done here as it's a native gem we can't put in train
 end
 
 group(:omnibus_package, :pry) do
@@ -31,17 +43,9 @@ group(:docgen) do
   gem "yard"
 end
 
-group(:maintenance, :ci) do
-  gem "tomlrb"
-
-  # To sync maintainers with github
-  gem "octokit"
-  gem "netrc"
-end
-
 # Everything except AIX
 group(:ruby_prof) do
-  gem "ruby-prof"
+  gem "ruby-prof", "< 0.18" # 0.18 includes a x64-mingw32 gem, which doesn't load correctly. See https://github.com/ruby-prof/ruby-prof/issues/255
 end
 
 # Everything except AIX and Windows
@@ -50,23 +54,22 @@ group(:ruby_shadow) do
 end
 
 group(:development, :test) do
-  gem "rake"
+  # we pin rake as a copy of rake is installed from the ruby source
+  # if you bump the ruby version you should confirm we don't end up with
+  # two rake gems installed again
+  gem "rake", "<= 12.3.2"
+
+  gem "rspec-core", "~> 3.5"
+  gem "rspec-mocks", "~> 3.5"
+  gem "rspec-expectations", "~> 3.5"
+  gem "rspec_junit_formatter", "~> 0.2.0"
   gem "simplecov"
+  gem "webmock"
+end
 
+group(:chefstyle) do
   # for testing new chefstyle rules
-  # gem 'chefstyle', github: 'chef/chefstyle'
   gem "chefstyle", git: "https://github.com/chef/chefstyle.git", branch: "master"
-end
-
-group(:ci) do
-  gem "github_changelog_generator", git: "https://github.com/chef/github-changelog-generator"
-  gem "mixlib-install"
-end
-
-group(:travis) do
-  # See `bundler-audit` in .travis.yml
-  gem "bundler-audit", git: "https://github.com/rubysec/bundler-audit.git"
-  gem "travis"
 end
 
 instance_eval(ENV["GEMFILE_MOD"]) if ENV["GEMFILE_MOD"]
@@ -74,3 +77,18 @@ instance_eval(ENV["GEMFILE_MOD"]) if ENV["GEMFILE_MOD"]
 # If you want to load debugging tools into the bundle exec sandbox,
 # add these additional dependencies into Gemfile.local
 eval_gemfile(__FILE__ + ".local") if File.exist?(__FILE__ + ".local")
+
+# These lines added for Windows development only.
+# For FFI to call into PowerShell we need the binaries and assemblies located
+# in the Ruby bindir.
+#
+# We copy (and overwrite) these files every time "bundle <exec|install>" is
+# executed, just in case they have changed.
+if RUBY_PLATFORM =~ /mswin|mingw|windows/
+  instance_eval do
+    ruby_exe_dir = RbConfig::CONFIG["bindir"]
+    assemblies = Dir.glob(File.expand_path("distro/ruby_bin_folder", Dir.pwd) + "/*.dll")
+    FileUtils.cp_r assemblies, ruby_exe_dir, verbose: false unless ENV["_BUNDLER_WINDOWS_DLLS_COPIED"]
+    ENV["_BUNDLER_WINDOWS_DLLS_COPIED"] = "1"
+  end
+end

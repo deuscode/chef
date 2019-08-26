@@ -1,5 +1,5 @@
 require "thread"
-require "chef/chef_fs/parallelizer/parallel_enumerable"
+require_relative "parallelizer/parallel_enumerable"
 
 class Chef
   module ChefFS
@@ -45,7 +45,7 @@ class Chef
       end
 
       def parallel_do(enumerable, options = {}, &block)
-        ParallelEnumerable.new(@tasks, enumerable, options.merge(:ordered => false), &block).wait
+        ParallelEnumerable.new(@tasks, enumerable, options.merge(ordered: false), &block).wait
       end
 
       def stop(wait = true, timeout = nil)

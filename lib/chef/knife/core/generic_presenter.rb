@@ -16,7 +16,7 @@
 # limitations under the License.
 #
 
-require "chef/knife/core/text_formatter"
+require_relative "text_formatter"
 
 class Chef
   class Knife
@@ -25,19 +25,19 @@ class Chef
       # Allows includer knife commands to  return multiple attributes
       # @brief knife node show NAME -a ATTR1 -a ATTR2
       module MultiAttributeReturnOption
-        # :nodoc:
+        # @private
         def self.included(includer)
           includer.class_eval do
             option :field_separator,
-              :short => "-S SEPARATOR",
-              :long => "--field-separator SEPARATOR",
-              :description => "Character separator used to delineate nesting in --attribute filters (default \".\")"
+              short: "-S SEPARATOR",
+              long: "--field-separator SEPARATOR",
+              description: "Character separator used to delineate nesting in --attribute filters (default \".\")"
 
             option :attribute,
-              :short => "-a ATTR1 [-a ATTR2]",
-              :long => "--attribute ATTR1 [--attribute ATTR2] ",
-              :description => "Show one or more attributes",
-              :proc => Proc.new { |a|
+              short: "-a ATTR1 [-a ATTR2]",
+              long: "--attribute ATTR1 [--attribute ATTR2] ",
+              description: "Show one or more attributes",
+              proc: Proc.new { |a|
                 Chef::Config[:knife][:attribute] ||= []
                 Chef::Config[:knife][:attribute].push(a)
               }
@@ -45,7 +45,6 @@ class Chef
         end
       end
 
-      #==Chef::Knife::Core::GenericPresenter
       # The base presenter class for displaying structured data in knife commands.
       # This is not an abstract base class, and it is suitable for displaying
       # most kinds of objects that knife needs to display.
@@ -90,7 +89,7 @@ class Chef
             require "yaml"
             YAML.dump(data)
           when :pp
-            require "stringio"
+            require "stringio" unless defined?(StringIO)
             # If you were looking for some attribute and there is only one match
             # just dump the attribute value
             if config[:attribute] && data.length == 1
@@ -202,13 +201,13 @@ class Chef
               end
           end
           # necessary (?) for coercing objects (the run_list object?) to hashes
-          ( !data.kind_of?(Array) && data.respond_to?(:to_hash) ) ? data.to_hash : data
+          ( !data.is_a?(Array) && data.respond_to?(:to_hash) ) ? data.to_hash : data
         end
 
         def format_cookbook_list_for_display(item)
           if config[:with_uri]
             item.inject({}) do |collected, (cookbook, versions)|
-              collected[cookbook] = Hash.new
+              collected[cookbook] = {}
               versions["versions"].each do |ver|
                 collected[cookbook][ver["version"]] = ver["url"]
               end
@@ -219,9 +218,9 @@ class Chef
               collected[cookbook] = versions["versions"].map { |v| v["version"] }
               collected
             end
-            key_length = versions_by_cookbook.empty? ? 0 : versions_by_cookbook.keys.map { |name| name.size }.max + 2
+            key_length = versions_by_cookbook.empty? ? 0 : versions_by_cookbook.keys.map(&:size).max + 2
             versions_by_cookbook.sort.map do |cookbook, versions|
-              "#{cookbook.ljust(key_length)} #{versions.join('  ')}"
+              "#{cookbook.ljust(key_length)} #{versions.join("  ")}"
             end
           end
         end

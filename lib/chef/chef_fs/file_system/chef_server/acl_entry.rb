@@ -16,15 +16,15 @@
 # limitations under the License.
 #
 
-require "chef/chef_fs/file_system/chef_server/rest_list_entry"
-require "chef/chef_fs/file_system/exceptions"
+require_relative "rest_list_entry"
+require_relative "../exceptions"
 
 class Chef
   module ChefFS
     module FileSystem
       module ChefServer
         class AclEntry < RestListEntry
-          PERMISSIONS = %w{create read update delete grant}
+          PERMISSIONS = %w{create read update delete grant}.freeze
 
           def api_path
             "#{super}/_acl"
@@ -51,7 +51,7 @@ class Chef
                 rest.put("#{api_path}/#{permission}", { permission => acls[permission] })
               rescue Timeout::Error => e
                 raise Chef::ChefFS::FileSystem::OperationFailedError.new(:write, self, e, "Timeout writing: #{e}")
-              rescue Net::HTTPServerException => e
+              rescue Net::HTTPClientException => e
                 if e.response.code == "404"
                   raise Chef::ChefFS::FileSystem::NotFoundError.new(self, e)
                 else

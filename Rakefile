@@ -1,7 +1,7 @@
 #
 # Author:: Adam Jacob (<adam@chef.io>)
 # Author:: Daniel DeLeo (<dan@chef.io>)
-# Copyright:: Copyright 2008-2016, Chef Software Inc.
+# Copyright:: Copyright 2008-2019, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,24 +17,31 @@
 # limitations under the License.
 #
 
-VERSION = IO.read(File.expand_path("../VERSION", __FILE__)).strip
-
-require "rubygems"
-require "chef/version"
-require "chef-config/package_task"
-require "rdoc/task"
 require_relative "tasks/rspec"
-require_relative "tasks/maintainers"
-require_relative "tasks/cbgb"
 require_relative "tasks/dependencies"
-require_relative "tasks/changelog"
 require_relative "tasks/announce"
-require_relative "tasks/version"
+require_relative "tasks/docs"
 
-ChefConfig::PackageTask.new(File.expand_path("..", __FILE__), "Chef", "chef") do |package|
-  package.component_paths = ["chef-config"]
-  package.generate_version_class = true
-  package.use_versionstring = true
+ENV["CHEF_LICENSE"] = "accept-no-persist"
+
+# hack the chef-config install to run before the traditional install task
+task :super_install do
+  chef_config_path = ::File.join(::File.dirname(__FILE__), "chef-config")
+  Dir.chdir(chef_config_path)
+  sh("rake install")
+end
+
+task install: :super_install
+
+# make sure we build the correct gemspec on windows
+gemspec = Gem.win_platform? ? "chef-universal-mingw32" : "chef"
+Bundler::GemHelper.install_tasks name: gemspec
+
+# this gets appended to the normal bundler install helper
+task :install do
+  chef_bin_path = ::File.join(::File.dirname(__FILE__), "chef-bin")
+  Dir.chdir(chef_bin_path)
+  sh("rake install:force")
 end
 
 task :pedant, :chef_zero_spec
@@ -51,15 +58,6 @@ task :register_eventlog do
   end
 end
 
-desc "Keep the Dockerfile up-to-date"
-task :update_dockerfile do
-  require "mixlib/install"
-  latest_stable_version = Mixlib::Install.available_versions("chef", "stable").last
-  text = File.read("Dockerfile")
-  new_text = text.gsub(/^ARG VERSION=[\d\.]+$/, "ARG VERSION=#{latest_stable_version}")
-  File.open("Dockerfile", "w+") { |f| f.write(new_text) }
-end
-
 begin
   require "chefstyle"
   require "rubocop/rake_task"
@@ -67,21 +65,17 @@ begin
     task.options += ["--display-cop-names", "--no-color"]
   end
 rescue LoadError
-  puts "chefstyle/rubocop is not available.  gem install chefstyle to do style checking."
+  puts "chefstyle/rubocop is not available. bundle install first to make sure all dependencies are installed."
 end
 
 begin
   require "yard"
-  DOC_FILES = [ "README.rdoc", "LICENSE", "spec/tiny_server.rb", "lib/**/*.rb" ]
-  namespace :yard do
-    desc "Create YARD documentation"
+  DOC_FILES = [ "spec/tiny_server.rb", "lib/**/*.rb" ].freeze
 
-    YARD::Rake::YardocTask.new(:html) do |t|
-      t.files = DOC_FILES
-      t.options = ["--format", "html"]
-    end
+  YARD::Rake::YardocTask.new(:docs) do |t|
+    t.files = DOC_FILES
+    t.options = ["--format", "html"]
   end
-
 rescue LoadError
-  puts "yard is not available. (sudo) gem install yard to generate yard documentation."
+  puts "yard is not available. bundle install first to make sure all dependencies are installed."
 end

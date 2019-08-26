@@ -1,5 +1,5 @@
 #
-# Copyright:: Copyright 2016-2017, Chef Software Inc.
+# Copyright:: Copyright 2016-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,13 +15,13 @@
 # limitations under the License.
 #
 
-require "chef/provider/package"
-require "chef/resource/dnf_package"
-require "chef/mixin/which"
-require "chef/mixin/shell_out"
-require "chef/mixin/get_source_from_package"
-require "chef/provider/package/dnf/python_helper"
-require "chef/provider/package/dnf/version"
+require_relative "../package"
+require_relative "../../resource/dnf_package"
+require_relative "../../mixin/which"
+require_relative "../../mixin/shell_out"
+require_relative "../../mixin/get_source_from_package"
+require_relative "dnf/python_helper"
+require_relative "dnf/version"
 
 class Chef
   class Provider
@@ -35,11 +35,18 @@ class Chef
         use_multipackage_api
         use_package_name_for_source
 
-        provides :package, platform_family: %w{rhel fedora amazon} do
-          which("dnf") && shell_out("rpm -q dnf").stdout =~ /^dnf-[1-9]/
+        # all rhel variants >= 8 will use DNF
+        provides :package, platform_family: "rhel", platform_version: ">= 8"
+
+        # fedora >= 22 uses DNF
+        provides :package, platform: "fedora", platform_version: ">= 22"
+
+        # amazon will eventually use DNF
+        provides :package, platform: "amazon" do
+          which("dnf")
         end
 
-        provides :dnf_package, os: "linux"
+        provides :dnf_package
 
         #
         # Most of the magic in this class happens in the python helper script.  The ruby side of this
@@ -88,10 +95,10 @@ class Chef
 
         def install_package(names, versions)
           if new_resource.source
-            dnf(options, "-y install", new_resource.source)
+            dnf(options, "-y", "install", new_resource.source)
           else
             resolved_names = names.each_with_index.map { |name, i| available_version(i).to_s unless name.nil? }
-            dnf(options, "-y install", resolved_names)
+            dnf(options, "-y", "install", resolved_names)
           end
           flushcache
         end
@@ -101,7 +108,7 @@ class Chef
 
         def remove_package(names, versions)
           resolved_names = names.each_with_index.map { |name, i| installed_version(i).to_s unless name.nil? }
-          dnf(options, "-y remove", resolved_names)
+          dnf(options, "-y", "remove", resolved_names)
           flushcache
         end
 
@@ -114,17 +121,21 @@ class Chef
         private
 
         def resolve_source_to_version_obj
-          shell_out_with_timeout!("rpm -qp --queryformat '%{NAME} %{EPOCH} %{VERSION} %{RELEASE} %{ARCH}\n' #{new_resource.source}").stdout.each_line do |line|
+          shell_out!("rpm -qp --queryformat '%{NAME} %{EPOCH} %{VERSION} %{RELEASE} %{ARCH}\n' #{new_resource.source}").stdout.each_line do |line|
             # this is another case of committing the sin of doing some lightweight mangling of RPM versions in ruby -- but the output of the rpm command
             # does not match what the dnf library accepts.
             case line
             when /^(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)$/
-              return Version.new($1, "#{$2 == '(none)' ? '0' : $2}:#{$3}-#{$4}", $5)
+              return Version.new($1, "#{$2 == "(none)" ? "0" : $2}:#{$3}-#{$4}", $5)
             end
           end
         end
 
-        # @returns Array<Version>
+        def version_compare(v1, v2)
+          python_helper.compare_versions(v1, v2)
+        end
+
+        # @return Array<Version>
         def available_version(index)
           @available_version ||= []
 
@@ -137,7 +148,7 @@ class Chef
           @available_version[index]
         end
 
-        # @returns Array<Version>
+        # @return [Array<Version>]
         def installed_version(index)
           @installed_version ||= []
           @installed_version[index] ||= if new_resource.source
@@ -156,7 +167,7 @@ class Chef
         end
 
         def dnf(*args)
-          shell_out_with_timeout!(a_to_s("dnf", *args))
+          shell_out!("dnf", *args)
         end
 
         def safe_version_array

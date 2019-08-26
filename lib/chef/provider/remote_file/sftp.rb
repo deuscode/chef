@@ -16,11 +16,11 @@
 # limitations under the License.
 #
 
-require "uri"
-require "tempfile"
+require "uri" unless defined?(URI)
+require "tempfile" unless defined?(Tempfile)
 require "net/sftp"
-require "chef/provider/remote_file"
-require "chef/file_content_management/tempfile"
+require_relative "../remote_file"
+require_relative "../../file_content_management/tempfile"
 
 class Chef
   class Provider
@@ -58,7 +58,7 @@ class Chef
 
         def sftp
           host = port ? "#{hostname}:#{port}" : hostname
-          @sftp ||= Net::SFTP.start(host, user, :password => pass)
+          @sftp ||= Net::SFTP.start(host, user, password: pass)
         end
 
         def pass

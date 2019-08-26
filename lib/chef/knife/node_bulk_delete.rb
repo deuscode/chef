@@ -16,15 +16,15 @@
 # limitations under the License.
 #
 
-require "chef/knife"
+require_relative "../knife"
 
 class Chef
   class Knife
     class NodeBulkDelete < Knife
 
       deps do
-        require "chef/node"
-        require "chef/json_compat"
+        require_relative "../node"
+        require_relative "../json_compat"
       end
 
       banner "knife node bulk delete REGEX (options)"
@@ -40,6 +40,7 @@ class Chef
 
         all_nodes.each do |name, node|
           next unless name =~ matcher
+
           nodes_to_delete[name] = node
         end
 

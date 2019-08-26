@@ -16,15 +16,15 @@
 # limitations under the License.
 #
 
-require "chef/knife"
+require_relative "../knife"
 
 class Chef
   class Knife
     class RoleBulkDelete < Knife
 
       deps do
-        require "chef/role"
-        require "chef/json_compat"
+        require_relative "../role"
+        require_relative "../json_compat"
       end
 
       banner "knife role bulk delete REGEX (options)"
@@ -41,6 +41,7 @@ class Chef
         roles_to_delete = {}
         all_roles.each do |name, role|
           next unless name =~ matcher
+
           roles_to_delete[role.name] = role
         end
 

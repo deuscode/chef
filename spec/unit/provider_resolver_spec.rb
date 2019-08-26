@@ -1,6 +1,6 @@
 #
 # Author:: Lamont Granquist (<lamont@chef.io>)
-# Copyright:: Copyright 2014-2016, Chef Software Inc.
+# Copyright:: Copyright 2014-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,7 +27,7 @@ require "fileutils"
 include Chef::Mixin::ConvertToClassName
 
 # Open up Provider so we can write things down easier in here
-#module Chef::Provider
+# module Chef::Provider
 
 describe Chef::ProviderResolver do
   include IntegrationSupport
@@ -428,7 +428,7 @@ describe Chef::ProviderResolver do
 
       # old debian uses the Debian provider (does not have insserv or upstart, or update-rc.d???)
       on_platform "debian", platform_version: "4.0", os: "linux" do
-        #it_behaves_like "a debian platform using the debian provider"
+        # it_behaves_like "a debian platform using the debian provider"
       end
 
       # Debian replaced the debian provider with insserv in the FIXME:VERSION distro
@@ -553,73 +553,61 @@ describe Chef::ProviderResolver do
 
     PROVIDERS =
       {
-        bash:                   [ Chef::Resource::Bash, Chef::Provider::Script ],
-        breakpoint:             [ Chef::Resource::Breakpoint, Chef::Resource::Breakpoint.action_class ],
-        chef_gem:               [ Chef::Resource::ChefGem, Chef::Provider::Package::Rubygems ],
-        cookbook_file:          [ Chef::Resource::CookbookFile, Chef::Provider::CookbookFile ],
-        csh:                    [ Chef::Resource::Csh, Chef::Provider::Script ],
-        deploy:                 [ Chef::Resource::Deploy, Chef::Provider::Deploy::Timestamped ],
-        deploy_revision:        [ Chef::Resource::DeployRevision, Chef::Provider::Deploy::Revision ],
-        directory:              [ Chef::Resource::Directory, Chef::Provider::Directory ],
-        erl_call:               [ Chef::Resource::ErlCall, Chef::Provider::ErlCall ],
-        execute:                [ Chef::Resource::Execute, Chef::Provider::Execute ],
-        file:                   [ Chef::Resource::File, Chef::Provider::File ],
-        gem_package:            [ Chef::Resource::GemPackage, Chef::Provider::Package::Rubygems ],
-        git:                    [ Chef::Resource::Git, Chef::Provider::Git ],
-        group:                  [ Chef::Resource::Group, Chef::Provider::Group::Gpasswd ],
-        homebrew_package:       [ Chef::Resource::HomebrewPackage, Chef::Provider::Package::Homebrew ],
-        http_request:           [ Chef::Resource::HttpRequest, Chef::Provider::HttpRequest ],
-        ifconfig:               [ Chef::Resource::Ifconfig, Chef::Provider::Ifconfig ],
-        link:                   [ Chef::Resource::Link, Chef::Provider::Link ],
-        log:                    [ Chef::Resource::Log, Chef::Provider::Log::ChefLog ],
-        macports_package:       [ Chef::Resource::MacportsPackage, Chef::Provider::Package::Macports ],
-        mdadm:                  [ Chef::Resource::Mdadm, Chef::Provider::Mdadm ],
-        mount:                  [ Chef::Resource::Mount, Chef::Provider::Mount::Mount ],
-        perl:                   [ Chef::Resource::Perl, Chef::Provider::Script ],
-        portage_package:        [ Chef::Resource::PortagePackage, Chef::Provider::Package::Portage ],
-        python:                 [ Chef::Resource::Python, Chef::Provider::Script ],
-        remote_directory:       [ Chef::Resource::RemoteDirectory, Chef::Provider::RemoteDirectory ],
-        route:                  [ Chef::Resource::Route, Chef::Provider::Route ],
-        ruby:                   [ Chef::Resource::Ruby, Chef::Provider::Script ],
-        ruby_block:             [ Chef::Resource::RubyBlock, Chef::Provider::RubyBlock ],
-        script:                 [ Chef::Resource::Script, Chef::Provider::Script ],
-        subversion:             [ Chef::Resource::Subversion, Chef::Provider::Subversion ],
-        template:               [ Chef::Resource::Template, Chef::Provider::Template ],
-        timestamped_deploy:     [ Chef::Resource::TimestampedDeploy, Chef::Provider::Deploy::Timestamped ],
-        aix_user:               [ Chef::Resource::User::AixUser, Chef::Provider::User::Aix ],
-        dscl_user:              [ Chef::Resource::User::DsclUser, Chef::Provider::User::Dscl ],
-        linux_user:             [ Chef::Resource::User::LinuxUser, Chef::Provider::User::Linux ],
-        pw_user:                [ Chef::Resource::User::PwUser, Chef::Provider::User::Pw ],
-        solaris_user:           [ Chef::Resource::User::SolarisUser, Chef::Provider::User::Solaris ],
-        windows_user:           [ Chef::Resource::User::WindowsUser, Chef::Provider::User::Windows ],
+        aix_user: [ Chef::Resource::User::AixUser, Chef::Provider::User::Aix ],
+        apt_package: [ Chef::Resource::AptPackage, Chef::Provider::Package::Apt ],
+        bash: [ Chef::Resource::Bash, Chef::Provider::Script ],
+        bff_package: [ Chef::Resource::BffPackage, Chef::Provider::Package::Bff ],
+        breakpoint: [ Chef::Resource::Breakpoint, Chef::Resource::Breakpoint.action_class ],
+        chef_gem: [ Chef::Resource::ChefGem, Chef::Provider::Package::Rubygems ],
+        cookbook_file: [ Chef::Resource::CookbookFile, Chef::Provider::CookbookFile ],
+        csh: [ Chef::Resource::Csh, Chef::Provider::Script ],
+        directory: [ Chef::Resource::Directory, Chef::Provider::Directory ],
+        dpkg_package: [ Chef::Resource::DpkgPackage, Chef::Provider::Package::Dpkg ],
+        dsc_script: [ Chef::Resource::DscScript, Chef::Provider::DscScript ],
+        dscl_user: [ Chef::Resource::User::DsclUser, Chef::Provider::User::Dscl ],
+        execute: [ Chef::Resource::Execute, Chef::Provider::Execute ],
+        file: [ Chef::Resource::File, Chef::Provider::File ],
+        gem_package: [ Chef::Resource::GemPackage, Chef::Provider::Package::Rubygems ],
+        git: [ Chef::Resource::Git, Chef::Provider::Git ],
+        group: [ Chef::Resource::Group, Chef::Provider::Group::Gpasswd ],
+        homebrew_package: [ Chef::Resource::HomebrewPackage, Chef::Provider::Package::Homebrew ],
+        http_request: [ Chef::Resource::HttpRequest, Chef::Provider::HttpRequest ],
+        ifconfig: [ Chef::Resource::Ifconfig, Chef::Provider::Ifconfig ],
+        ips_package: [ Chef::Resource::IpsPackage, Chef::Provider::Package::Ips ],
+        link: [ Chef::Resource::Link, Chef::Provider::Link ],
+        linux_user: [ Chef::Resource::User::LinuxUser, Chef::Provider::User::Linux ],
+        log: [ Chef::Resource::Log, Chef::Provider::Log::ChefLog ],
+        macports_package: [ Chef::Resource::MacportsPackage, Chef::Provider::Package::Macports ],
+        mdadm: [ Chef::Resource::Mdadm, Chef::Provider::Mdadm ],
+        mount: [ Chef::Resource::Mount, Chef::Provider::Mount::Mount ],
+        pacman_package: [ Chef::Resource::PacmanPackage, Chef::Provider::Package::Pacman ],
+        paludis_package: [ Chef::Resource::PaludisPackage, Chef::Provider::Package::Paludis ],
+        perl: [ Chef::Resource::Perl, Chef::Provider::Script ],
+        portage_package: [ Chef::Resource::PortagePackage, Chef::Provider::Package::Portage ],
+        pw_user: [ Chef::Resource::User::PwUser, Chef::Provider::User::Pw ],
+        python: [ Chef::Resource::Python, Chef::Provider::Script ],
+        remote_directory: [ Chef::Resource::RemoteDirectory, Chef::Provider::RemoteDirectory ],
+        route: [ Chef::Resource::Route, Chef::Provider::Route ],
+        rpm_package: [ Chef::Resource::Package::RpmPackage, Chef::Provider::Package::Rpm ],
+        ruby_block: [ Chef::Resource::RubyBlock, Chef::Provider::RubyBlock ],
+        ruby: [ Chef::Resource::Ruby, Chef::Provider::Script ],
+        script: [ Chef::Resource::Script, Chef::Provider::Script ],
+        smartos_package: [ Chef::Resource::SmartosPackage, Chef::Provider::Package::SmartOS ],
+        snap_package: [ Chef::Resource::SnapPackage, Chef::Provider::Package::Snap ],
+        solaris_package: [ Chef::Resource::SolarisPackage, Chef::Provider::Package::Solaris ],
+        solaris_user: [ Chef::Resource::User::SolarisUser, Chef::Provider::User::Solaris ],
+        subversion: [ Chef::Resource::Subversion, Chef::Provider::Subversion ],
+        template: [ Chef::Resource::Template, Chef::Provider::Template ],
         whyrun_safe_ruby_block: [ Chef::Resource::WhyrunSafeRubyBlock, Chef::Provider::WhyrunSafeRubyBlock ],
-
-        # We want to check that these are unsupported:
-        apt_package: nil,
-        bff_package: nil,
-        dpkg_package: nil,
-        dsc_script: nil,
-        ips_package: nil,
-        pacman_package: nil,
-        paludis_package: nil,
-        rpm_package: nil,
-        smartos_package: nil,
-        solaris_package: nil,
-        yum_package: nil,
-        windows_package: nil,
-        windows_service: nil,
+        windows_package: [ Chef::Resource::WindowsPackage, Chef::Provider::Package::Windows ],
+        windows_service: [ Chef::Resource::WindowsService, Chef::Provider::Service::Windows ],
+        windows_user: [ Chef::Resource::User::WindowsUser, Chef::Provider::User::Windows ],
+        yum_package: [ Chef::Resource::YumPackage, Chef::Provider::Package::Yum ],
 
         "linux" => {
-          apt_package:     [ Chef::Resource::AptPackage, Chef::Provider::Package::Apt ],
-          dpkg_package:    [ Chef::Resource::DpkgPackage, Chef::Provider::Package::Dpkg ],
-          pacman_package:  [ Chef::Resource::PacmanPackage, Chef::Provider::Package::Pacman ],
-          paludis_package: [ Chef::Resource::PaludisPackage, Chef::Provider::Package::Paludis ],
-          rpm_package:     [ Chef::Resource::RpmPackage, Chef::Provider::Package::Rpm ],
-          yum_package:     [ Chef::Resource::YumPackage, Chef::Provider::Package::Yum ],
-
           "debian" => {
             ifconfig: [ Chef::Resource::Ifconfig, Chef::Provider::Ifconfig::Debian ],
-            package:  [ Chef::Resource::AptPackage, Chef::Provider::Package::Apt ],
+            package: [ Chef::Resource::AptPackage, Chef::Provider::Package::Apt ],
     #        service: [ Chef::Resource::DebianService, Chef::Provider::Service::Debian ],
 
             "debian" => {
@@ -682,21 +670,17 @@ describe Chef::ProviderResolver do
                 group: [ Chef::Resource::Group, Chef::Provider::Group::Suse ],
               },
             },
-            "opensuse" => {
-    #          service: [ Chef::Resource::RedhatService, Chef::Provider::Service::Redhat ],
-              package: [ Chef::Resource::ZypperPackage, Chef::Provider::Package::Zypper ],
-              group:   [ Chef::Resource::Group, Chef::Provider::Group::Usermod ],
-              "12.3" => {
-              },
-              "12.2" => {
-                group: [ Chef::Resource::Group, Chef::Provider::Group::Suse ],
+            "opensuseleap" => {
+              %w{42.3} => {
+                package: [ Chef::Resource::ZypperPackage, Chef::Provider::Package::Zypper ],
+                group: [ Chef::Resource::Group, Chef::Provider::Group::Gpasswd ],
               },
             },
           },
 
           "gentoo" => {
             # TODO should be Chef::Resource::PortagePackage
-            package:         [ Chef::Resource::Package, Chef::Provider::Package::Portage ],
+            package: [ Chef::Resource::Package, Chef::Provider::Package::Portage ],
             portage_package: [ Chef::Resource::PortagePackage, Chef::Provider::Package::Portage ],
     #        service: [ Chef::Resource::GentooService, Chef::Provider::Service::Gentoo ],
 
@@ -708,18 +692,21 @@ describe Chef::ProviderResolver do
 
           "rhel" => {
     #        service: [ Chef::Resource::SystemdService, Chef::Provider::Service::Systemd ],
-            package:  [ Chef::Resource::YumPackage, Chef::Provider::Package::Yum ],
+            package: [ Chef::Resource::DnfPackage, Chef::Provider::Package::Dnf ],
             ifconfig: [ Chef::Resource::Ifconfig, Chef::Provider::Ifconfig::Redhat ],
 
             %w{amazon xcp xenserver ibm_powerkvm cloudlinux parallels} => {
               "3.1.4" => {
+                package: [ Chef::Resource::YumPackage, Chef::Provider::Package::Yum ],
     #            service: [ Chef::Resource::RedhatService, Chef::Provider::Service::Redhat ],
               },
             },
             %w{redhat centos scientific oracle} => {
               "7.0" => {
+                package: [ Chef::Resource::YumPackage, Chef::Provider::Package::Yum ],
               },
               "6.0" => {
+                package: [ Chef::Resource::YumPackage, Chef::Provider::Package::Yum ],
     #            service: [ Chef::Resource::RedhatService, Chef::Provider::Service::Redhat ],
               },
             },
@@ -737,7 +724,7 @@ describe Chef::ProviderResolver do
         "freebsd" => {
           "freebsd" => {
             group: [ Chef::Resource::Group, Chef::Provider::Group::Pw ],
-            user:  [ Chef::Resource::User::PwUser, Chef::Provider::User::Pw ],
+            user: [ Chef::Resource::User::PwUser, Chef::Provider::User::Pw ],
 
             "freebsd" => {
               "10.3" => {
@@ -748,10 +735,10 @@ describe Chef::ProviderResolver do
 
         "darwin" => {
           %w{mac_os_x mac_os_x_server} => {
-            group:   [ Chef::Resource::Group, Chef::Provider::Group::Dscl ],
+            group: [ Chef::Resource::Group, Chef::Provider::Group::Dscl ],
             package: [ Chef::Resource::HomebrewPackage, Chef::Provider::Package::Homebrew ],
             osx_profile: [ Chef::Resource::OsxProfile, Chef::Provider::OsxProfile],
-            user:    [ Chef::Resource::User::DsclUser, Chef::Provider::User::Dscl ],
+            user: [ Chef::Resource::User::DsclUser, Chef::Provider::User::Dscl ],
 
             "mac_os_x" => {
               "10.9.2" => {
@@ -761,17 +748,17 @@ describe Chef::ProviderResolver do
         },
 
         "windows" => {
-          batch:             [ Chef::Resource::Batch, Chef::Provider::Batch ],
-          dsc_script:        [ Chef::Resource::DscScript, Chef::Provider::DscScript ],
-          env:               [ Chef::Resource::Env, Chef::Provider::Env::Windows ],
-          group:             [ Chef::Resource::Group, Chef::Provider::Group::Windows ],
-          mount:             [ Chef::Resource::Mount, Chef::Provider::Mount::Windows ],
-          package:           [ Chef::Resource::WindowsPackage, Chef::Provider::Package::Windows ],
+          batch: [ Chef::Resource::Batch, Chef::Provider::Batch ],
+          dsc_script: [ Chef::Resource::DscScript, Chef::Provider::DscScript ],
+          windows_env: [ Chef::Resource::WindowsEnv, Chef::Provider::WindowsEnv ],
+          group: [ Chef::Resource::Group, Chef::Provider::Group::Windows ],
+          mount: [ Chef::Resource::Mount, Chef::Provider::Mount::Windows ],
+          package: [ Chef::Resource::WindowsPackage, Chef::Provider::Package::Windows ],
           powershell_script: [ Chef::Resource::PowershellScript, Chef::Provider::PowershellScript ],
-          service:           [ Chef::Resource::WindowsService, Chef::Provider::Service::Windows ],
-          user:              [ Chef::Resource::User::WindowsUser, Chef::Provider::User::Windows ],
-          windows_package:   [ Chef::Resource::WindowsPackage, Chef::Provider::Package::Windows ],
-          windows_service:   [ Chef::Resource::WindowsService, Chef::Provider::Service::Windows ],
+          service: [ Chef::Resource::WindowsService, Chef::Provider::Service::Windows ],
+          user: [ Chef::Resource::User::WindowsUser, Chef::Provider::User::Windows ],
+          windows_package: [ Chef::Resource::WindowsPackage, Chef::Provider::Package::Windows ],
+          windows_service: [ Chef::Resource::WindowsService, Chef::Provider::Service::Windows ],
 
           "windows" => {
             %w{mswin mingw32 windows} => {
@@ -782,13 +769,11 @@ describe Chef::ProviderResolver do
         },
 
         "aix" => {
-          bff_package: [ Chef::Resource::BffPackage, Chef::Provider::Package::Aix ],
           cron: [ Chef::Resource::Cron, Chef::Provider::Cron::Aix ],
           group: [ Chef::Resource::Group, Chef::Provider::Group::Aix ],
           ifconfig: [ Chef::Resource::Ifconfig, Chef::Provider::Ifconfig::Aix ],
           mount: [ Chef::Resource::Mount, Chef::Provider::Mount::Aix ],
-          # TODO should be Chef::Resource::BffPackage
-          package: [ Chef::Resource::Package, Chef::Provider::Package::Aix ],
+          package: [ Chef::Resource::Package, Chef::Provider::Package::Bff ],
           rpm_package: [ Chef::Resource::RpmPackage, Chef::Provider::Package::Rpm ],
           user: [ Chef::Resource::User::AixUser, Chef::Provider::User::Aix ],
     #      service: [ Chef::Resource::AixService, Chef::Provider::Service::Aix ],
@@ -796,16 +781,6 @@ describe Chef::ProviderResolver do
           "aix" => {
             "aix" => {
               "5.6" => {
-              },
-            },
-          },
-        },
-
-        "hpux" => {
-          "hpux" => {
-            "hpux" => {
-              "3.1.4" => {
-                group: [ Chef::Resource::Group, Chef::Provider::Group::Usermod ],
               },
             },
           },
@@ -834,15 +809,15 @@ describe Chef::ProviderResolver do
         },
 
         "solaris2" => {
-          group:           [ Chef::Resource::Group, Chef::Provider::Group::Usermod ],
-          ips_package:     [ Chef::Resource::IpsPackage, Chef::Provider::Package::Ips ],
-          package:         [ Chef::Resource::SolarisPackage, Chef::Provider::Package::Solaris ],
-          mount:           [ Chef::Resource::Mount, Chef::Provider::Mount::Solaris ],
+          group: [ Chef::Resource::Group, Chef::Provider::Group::Usermod ],
+          ips_package: [ Chef::Resource::IpsPackage, Chef::Provider::Package::Ips ],
+          package: [ Chef::Resource::SolarisPackage, Chef::Provider::Package::Solaris ],
+          mount: [ Chef::Resource::Mount, Chef::Provider::Mount::Solaris ],
           solaris_package: [ Chef::Resource::SolarisPackage, Chef::Provider::Package::Solaris ],
 
           "smartos" => {
             smartos_package: [ Chef::Resource::SmartosPackage, Chef::Provider::Package::SmartOS ],
-            package:         [ Chef::Resource::SmartosPackage, Chef::Provider::Package::SmartOS ],
+            package: [ Chef::Resource::SmartosPackage, Chef::Provider::Package::SmartOS ],
 
             "smartos" => {
               "3.1.4" => {
@@ -872,21 +847,11 @@ describe Chef::ProviderResolver do
               user: [ Chef::Resource::User::SolarisUser, Chef::Provider::User::Solaris ],
               "5.11" => {
                 package: [ Chef::Resource::IpsPackage, Chef::Provider::Package::Ips ],
-              },
-              "5.9" => {
+                group: [ Chef::Resource::Group, Chef::Provider::Group::Solaris ],
               },
             },
           },
 
-        },
-
-        "solaris" => {
-          "solaris" => {
-            "solaris" => {
-              "3.1.4" => {
-              },
-            },
-          },
         },
 
         "exherbo" => {
@@ -899,12 +864,12 @@ describe Chef::ProviderResolver do
             },
           },
         },
-      }
+      }.freeze
 
     def self.create_provider_tests(providers, test, expected, filter)
       expected = expected.merge(providers.select { |key, value| key.is_a?(Symbol) })
       providers.each do |key, value|
-        if !key.is_a?(Symbol)
+        unless key.is_a?(Symbol)
           next_test = test.merge({ filter => key })
           next_filter =
             case filter
@@ -923,7 +888,7 @@ describe Chef::ProviderResolver do
         end
       end
       # If there is no filter, we're as deep as we need to go
-      if !filter
+      unless filter
         on_platform test.delete(:platform), test do
           expect_providers(expected)
         end

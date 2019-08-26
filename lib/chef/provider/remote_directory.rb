@@ -1,6 +1,6 @@
 #
 # Author:: Adam Jacob (<adam@chef.io>)
-# Copyright:: Copyright 2008-2016, Chef Software, Inc.
+# Copyright:: Copyright 2008-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,15 +16,15 @@
 # limitations under the License.
 #
 
-require "chef/provider/directory"
-require "chef/resource/file"
-require "chef/resource/directory"
-require "chef/resource/cookbook_file"
-require "chef/mixin/file_class"
-require "chef/platform/query_helpers"
-require "chef/util/path_helper"
+require_relative "directory"
+require_relative "../resource/file"
+require_relative "../resource/directory"
+require_relative "../resource/cookbook_file"
+require_relative "../mixin/file_class"
+require_relative "../platform/query_helpers"
+require_relative "../util/path_helper"
 
-require "forwardable"
+require "forwardable" unless defined?(Forwardable)
 
 class Chef
   class Provider
@@ -46,8 +46,6 @@ class Chef
         @overwrite = new_resource.overwrite if @overwrite.nil?
         !!@overwrite
       end
-
-      attr_accessor :managed_files
 
       # Hash containing keys of the paths for all the files that we sync, plus all their
       # parent directories.
@@ -104,7 +102,7 @@ class Chef
         if purge
           Dir.glob(::File.join(Chef::Util::PathHelper.escape_glob_dir(path), "**", "*"), ::File::FNM_DOTMATCH).sort!.reverse!.each do |file|
             # skip '.' and '..'
-            next if [".", ".."].include?(Pathname.new(file).basename().to_s)
+            next if [".", ".."].include?(Pathname.new(file).basename.to_s)
 
             # Clean the path.  This is required because of the ::File.join
             file = Chef::Util::PathHelper.cleanpath(file)
@@ -153,7 +151,7 @@ class Chef
       #
       # FIXME: it should do breadth-first, see CHEF-5080 (please use a performant sort)
       #
-      # @return Array<String> The list of files to transfer
+      # @return [Array<String>] The list of files to transfer
       # @api private
       #
       def files_to_transfer

@@ -1,6 +1,6 @@
 #
 # Author:: Vasiliy Tolstov (<v.tolstov@selfip.ru>)
-# Copyright:: Copyright 2014-2016, Chef Software Inc.
+# Copyright:: Copyright 2014-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,18 +16,23 @@
 # limitations under the License.
 #
 
-require "chef/resource/package"
-require "chef/provider/package/paludis"
+require_relative "package"
+require_relative "../provider/package/paludis"
 
 class Chef
   class Resource
     class PaludisPackage < Chef::Resource::Package
       resource_name :paludis_package
-      provides :paludis_package, os: "linux"
+      provides :paludis_package
+
+      description "Use the paludis_package resource to manage packages for the Paludis platform."
+      introduced "12.1"
 
       allowed_actions :install, :remove, :upgrade
 
-      property :timeout, default: 3600
+      property :timeout, Integer,
+        description: "The amount of time (in seconds) to wait before timing out.",
+        default: 3600
     end
   end
 end

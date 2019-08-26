@@ -28,23 +28,21 @@ describe Chef::Resource::WindowsScript::PowershellScript, :windows_only do
 
   it_behaves_like "a Windows script running on Windows"
 
-  let(:successful_executable_script_content) { "#{ENV['SystemRoot']}\\system32\\attrib.exe $env:systemroot" }
-  let(:failed_executable_script_content) { "#{ENV['SystemRoot']}\\system32\\attrib.exe /badargument" }
+  let(:successful_executable_script_content) { "#{ENV["SystemRoot"]}\\system32\\attrib.exe $env:systemroot" }
+  let(:failed_executable_script_content) { "#{ENV["SystemRoot"]}\\system32\\attrib.exe /badargument" }
   let(:processor_architecture_script_content) { "echo $env:PROCESSOR_ARCHITECTURE" }
   let(:native_architecture_script_content) { "echo $env:PROCESSOR_ARCHITECTUREW6432" }
   let(:cmdlet_exit_code_not_found_content) { "get-item '.\\thisdoesnotexist'" }
   let(:cmdlet_exit_code_success_content) { "get-item ." }
-  let(:windows_process_exit_code_success_content) { "#{ENV['SystemRoot']}\\system32\\attrib.exe $env:systemroot" }
+  let(:windows_process_exit_code_success_content) { "#{ENV["SystemRoot"]}\\system32\\attrib.exe $env:systemroot" }
   let(:windows_process_exit_code_not_found_content) { "findstr /notavalidswitch" }
-  # Note that process exit codes on 32-bit Win2k3 cannot
-  # exceed maximum value of signed integer
   let(:arbitrary_nonzero_process_exit_code) { 4193 }
   let(:arbitrary_nonzero_process_exit_code_content) { "exit #{arbitrary_nonzero_process_exit_code}" }
   let(:invalid_powershell_interpreter_flag) { "/thisflagisinvalid" }
   let(:valid_powershell_interpreter_flag) { "-Sta" }
 
   let!(:resource) do
-    r = Chef::Resource::WindowsScript::PowershellScript.new("Powershell resource functional test", @run_context)
+    r = Chef::Resource::WindowsScript::PowershellScript.new("PowerShell resource functional test", @run_context)
     r.code(successful_executable_script_content)
     r
   end
@@ -156,7 +154,7 @@ describe Chef::Resource::WindowsScript::PowershellScript, :windows_only do
     # This somewhat ambiguous case, two failures of different types,
     # seems to violate the principle of returning the status of the
     # last line executed -- in this case, we return the status of the
-    # second to last line. This happens because Powershell gives no
+    # second to last line. This happens because PowerShell gives no
     # way for us to determine whether the last operation was a cmdlet
     # or Windows process. Because the latter gives more specific
     # errors than 0 or 1, we return that instead, which is acceptable
@@ -233,20 +231,26 @@ describe Chef::Resource::WindowsScript::PowershellScript, :windows_only do
       expect(is_64_bit).to eq(detected_64_bit)
     end
 
+    it "returns 0 if a valid flag is passed to the interpreter" do
+      resource.code(cmdlet_exit_code_success_content)
+      resource.flags(valid_powershell_interpreter_flag)
+      resource.returns(0)
+      resource.run_action(:run)
+    end
+
+    it "returns 0 if no flag is passed to the interpreter" do
+      resource.code(cmdlet_exit_code_success_content)
+      resource.returns(0)
+      resource.run_action(:run)
+    end
+
     it "returns 1 if an invalid flag is passed to the interpreter" do
       pending "powershell.exe always exits with 0 on nano" if Chef::Platform.windows_nano_server?
 
       resource.code(cmdlet_exit_code_success_content)
       resource.flags(invalid_powershell_interpreter_flag)
       resource.returns(1)
-      resource.run_action(:run)
-    end
-
-    it "returns 0 if a valid flag is passed to the interpreter" do
-      resource.code(cmdlet_exit_code_success_content)
-      resource.flags(valid_powershell_interpreter_flag)
-      resource.returns(0)
-      resource.run_action(:run)
+      expect { resource.run_action(:run) }.to raise_error(Mixlib::ShellOut::ShellCommandFailed)
     end
 
     it "raises an error when given a block and a guard_interpreter" do
@@ -257,16 +261,16 @@ describe Chef::Resource::WindowsScript::PowershellScript, :windows_only do
 
     context "when dsc is supported", :windows_powershell_dsc_only do
       it "can execute LCM configuration code" do
-        resource.code <<-EOF
-configuration LCM
-{
-  param ($thumbprint)
-  localconfigurationmanager
-  {
-    RebootNodeIfNeeded = $false
-    ConfigurationMode = 'ApplyOnly'
-  }
-}
+        resource.code <<~EOF
+          configuration LCM
+          {
+            param ($thumbprint)
+            localconfigurationmanager
+            {
+              RebootNodeIfNeeded = $false
+              ConfigurationMode = 'ApplyOnly'
+            }
+          }
         EOF
         expect { resource.run_action(:run) }.not_to raise_error
       end
@@ -475,26 +479,26 @@ configuration LCM
       end
 
       it "evaluates a not_if block using the cwd guard parameter" do
-        custom_cwd = "#{ENV['SystemRoot']}\\system32\\drivers\\etc"
-        resource.not_if "exit ! [int32]($pwd.path -eq '#{custom_cwd}')", :cwd => custom_cwd
+        custom_cwd = "#{ENV["SystemRoot"]}\\system32\\drivers\\etc"
+        resource.not_if "exit ! [int32]($pwd.path -eq '#{custom_cwd}')", cwd: custom_cwd
         expect(resource.should_skip?(:run)).to be_truthy
       end
 
       it "evaluates an only_if block using the cwd guard parameter" do
-        custom_cwd = "#{ENV['SystemRoot']}\\system32\\drivers\\etc"
-        resource.only_if "exit ! [int32]($pwd.path -eq '#{custom_cwd}')", :cwd => custom_cwd
+        custom_cwd = "#{ENV["SystemRoot"]}\\system32\\drivers\\etc"
+        resource.only_if "exit ! [int32]($pwd.path -eq '#{custom_cwd}')", cwd: custom_cwd
         expect(resource.should_skip?(:run)).to be_falsey
       end
 
       it "inherits cwd from the parent resource for only_if" do
-        custom_cwd = "#{ENV['SystemRoot']}\\system32\\drivers\\etc"
+        custom_cwd = "#{ENV["SystemRoot"]}\\system32\\drivers\\etc"
         resource.cwd custom_cwd
         resource.only_if "exit ! [int32]($pwd.path -eq '#{custom_cwd}')"
         expect(resource.should_skip?(:run)).to be_falsey
       end
 
       it "inherits cwd from the parent resource for not_if" do
-        custom_cwd = "#{ENV['SystemRoot']}\\system32\\drivers\\etc"
+        custom_cwd = "#{ENV["SystemRoot"]}\\system32\\drivers\\etc"
         resource.cwd custom_cwd
         resource.not_if "exit ! [int32]($pwd.path -eq '#{custom_cwd}')"
         expect(resource.should_skip?(:run)).to be_truthy
@@ -583,10 +587,11 @@ configuration LCM
       end
 
       it "raises an error when a 32-bit guard is used on Windows Nano Server", :windows_nano_only do
-        resource.only_if "$true", :architecture => :i386
+        resource.only_if "$true", architecture: :i386
         expect { resource.run_action(:run) }.to raise_error(
           Chef::Exceptions::Win32ArchitectureIncorrect,
-          /cannot execute script with requested architecture 'i386' on Windows Nano Server/)
+          /cannot execute script with requested architecture 'i386' on Windows Nano Server/
+        )
       end
     end
   end

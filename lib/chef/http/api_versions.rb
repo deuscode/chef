@@ -15,8 +15,8 @@
 # limitations under the License.
 #
 
-require "chef/server_api_versions"
-require "chef/json_compat"
+require_relative "../server_api_versions"
+require_relative "../json_compat"
 
 class Chef
   class HTTP
@@ -24,8 +24,7 @@ class Chef
     # and maximum supported API versions.
     class APIVersions
 
-      def initialize(options = {})
-      end
+      def initialize(options = {}); end
 
       def handle_request(method, url, headers = {}, data = false)
         [method, url, headers, data]
@@ -37,6 +36,8 @@ class Chef
         end
         if http_response.key?("x-ops-server-api-version")
           ServerAPIVersions.instance.set_versions(JSONCompat.parse(http_response["x-ops-server-api-version"]))
+        else
+          ServerAPIVersions.instance.unversioned!
         end
         [http_response, rest_request, return_value]
       end

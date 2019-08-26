@@ -15,14 +15,13 @@
 # limitations under the License.
 #
 
-require "chef/request_id"
+require_relative "../request_id"
 
 class Chef
   class HTTP
     class RemoteRequestID
 
-      def initialize(opts = {})
-      end
+      def initialize(opts = {}); end
 
       def handle_request(method, url, headers = {}, data = false)
         headers["X-REMOTE-REQUEST-ID"] = Chef::RequestID.instance.request_id

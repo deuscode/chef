@@ -16,11 +16,11 @@
 # limitations under the License.
 #
 
-require "chef/provider/package"
-require "chef/resource/cab_package"
-require "chef/mixin/shell_out"
-require "chef/mixin/uris"
-require "chef/mixin/checksum"
+require_relative "../package"
+require_relative "../../resource/cab_package"
+require_relative "../../mixin/shell_out"
+require_relative "../../mixin/uris"
+require_relative "../../mixin/checksum"
 
 class Chef
   class Provider
@@ -46,7 +46,7 @@ class Chef
 
         def download_source_file
           source_resource.run_action(:create)
-          Chef::Log.debug("#{new_resource} fetched source file to #{source_resource.path}")
+          logger.trace("#{new_resource} fetched source file to #{source_resource.path}")
           source_resource.path
         end
 
@@ -74,9 +74,14 @@ class Chef
         end
 
         def dism_command(command)
-          shellout = Mixlib::ShellOut.new("dism.exe /Online /English #{command} /NoRestart", timeout: new_resource.timeout)
           with_os_architecture(nil) do
-            shellout.run_command
+            result = shell_out("dism.exe /Online /English #{command} /NoRestart", { timeout: new_resource.timeout })
+            if result.exitstatus == -2146498530
+              raise Chef::Exceptions::Package, "The specified package is not applicable to this image." if result.stdout.include?("0x800f081e")
+
+              result.error!
+            end
+            result
           end
         end
 
@@ -84,7 +89,7 @@ class Chef
           # e.g. Package_for_KB2975719~31bf3856ad364e35~amd64~~6.3.1.8
           package = new_cab_identity
           # Search for just the package name to catch a different version being installed
-          Chef::Log.debug("#{new_resource} searching for installed package #{package['name']}")
+          logger.trace("#{new_resource} searching for installed package #{package["name"]}")
           existing_package_identities = installed_packages.map do |p|
             split_package_identity(p["package_identity"])
           end
@@ -97,7 +102,7 @@ class Chef
             found_packages.first["version"]
           else
             # Presuming this won't happen, otherwise we need to handle it
-            raise Chef::Exceptions::Package, "Found multiple packages installed matching name #{package['name']}, found: #{found_packages.length} matches"
+            raise Chef::Exceptions::Package, "Found multiple packages installed matching name #{package["name"]}, found: #{found_packages.length} matches"
           end
         end
 
@@ -108,7 +113,7 @@ class Chef
         end
 
         def new_cab_identity
-          Chef::Log.debug("#{new_resource} getting product version for package at #{cab_file_source}")
+          logger.trace("#{new_resource} getting product version for package at #{cab_file_source}")
           @new_cab_identity ||= cab_identity_from_cab_file
         end
 
@@ -123,6 +128,7 @@ class Chef
           text.each_line do |line|
             key, value = line.split(":") if line.start_with?("Package Identity")
             next if key.nil? || value.nil?
+
             package = {}
             package[key.downcase.strip.tr(" ", "_")] = value.strip.chomp
             packages << package

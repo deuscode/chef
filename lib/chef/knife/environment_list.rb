@@ -16,23 +16,22 @@
 # limitations under the License.
 #
 
-require "chef/knife"
+require_relative "../knife"
 
 class Chef
   class Knife
     class EnvironmentList < Knife
 
       deps do
-        require "chef/environment"
-        require "chef/json_compat"
+        require_relative "../environment"
       end
 
       banner "knife environment list (options)"
 
       option :with_uri,
-        :short => "-w",
-        :long => "--with-uri",
-        :description => "Show corresponding URIs"
+        short: "-w",
+        long: "--with-uri",
+        description: "Show corresponding URIs."
 
       def run
         output(format_list_for_display(Chef::Environment.list))

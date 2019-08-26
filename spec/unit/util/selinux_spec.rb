@@ -1,6 +1,6 @@
 #
 # Author:: Serdar Sutay (<serdar@chef.io>)
-# Copyright:: Copyright 2013-2017, Chef Software Inc.
+# Copyright:: Copyright 2013-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -60,8 +60,8 @@ describe Chef::Util::Selinux do
 
     describe "when selinux is enabled" do
       before do
-        cmd_result = double("Cmd Result", :exitstatus => 0)
-        expect(@test_instance).to receive(:shell_out!).once.with(@selinux_enabled_path, { :returns => [0, 1] }).and_return(cmd_result)
+        cmd_result = double("Cmd Result", exitstatus: 0)
+        expect(@test_instance).to receive(:shell_out!).once.with(@selinux_enabled_path, { returns: [0, 1] }).and_return(cmd_result)
       end
 
       it "should report selinux is enabled" do
@@ -73,8 +73,8 @@ describe Chef::Util::Selinux do
 
     describe "when selinux is disabled" do
       before do
-        cmd_result = double("Cmd Result", :exitstatus => 1)
-        expect(@test_instance).to receive(:shell_out!).once.with(@selinux_enabled_path, { :returns => [0, 1] }).and_return(cmd_result)
+        cmd_result = double("Cmd Result", exitstatus: 1)
+        expect(@test_instance).to receive(:shell_out!).once.with(@selinux_enabled_path, { returns: [0, 1] }).and_return(cmd_result)
       end
 
       it "should report selinux is disabled" do
@@ -86,8 +86,8 @@ describe Chef::Util::Selinux do
 
     describe "when selinux gives an unexpected status" do
       before do
-        cmd_result = double("Cmd Result", :exitstatus => 101)
-        expect(@test_instance).to receive(:shell_out!).once.with(@selinux_enabled_path, { :returns => [0, 1] }).and_return(cmd_result)
+        cmd_result = double("Cmd Result", exitstatus: 101)
+        expect(@test_instance).to receive(:shell_out!).once.with(@selinux_enabled_path, { returns: [0, 1] }).and_return(cmd_result)
       end
 
       it "should throw an error" do
@@ -124,24 +124,21 @@ describe Chef::Util::Selinux do
     end
 
     it "should call restorecon non-recursive by default" do
-      restorecon_command = "#{@restorecon_enabled_path} -R \"#{path}\""
-      expect(@test_instance).to receive(:shell_out!).twice.with(restorecon_command)
+      expect(@test_instance).to receive(:shell_out_compacted!).with(@restorecon_enabled_path, "-R", path).twice
       @test_instance.restore_security_context(path)
       expect(File).not_to receive(:executable?)
       @test_instance.restore_security_context(path)
     end
 
     it "should call restorecon recursive when recursive is set" do
-      restorecon_command = "#{@restorecon_enabled_path} -R -r \"#{path}\""
-      expect(@test_instance).to receive(:shell_out!).twice.with(restorecon_command)
+      expect(@test_instance).to receive(:shell_out_compacted!).with(@restorecon_enabled_path, "-R", "-r", path).twice
       @test_instance.restore_security_context(path, true)
       expect(File).not_to receive(:executable?)
       @test_instance.restore_security_context(path, true)
     end
 
     it "should call restorecon non-recursive when recursive is not set" do
-      restorecon_command = "#{@restorecon_enabled_path} -R \"#{path}\""
-      expect(@test_instance).to receive(:shell_out!).twice.with(restorecon_command)
+      expect(@test_instance).to receive(:shell_out_compacted!).with(@restorecon_enabled_path, "-R", path).twice
       @test_instance.restore_security_context(path)
       expect(File).not_to receive(:executable?)
       @test_instance.restore_security_context(path)

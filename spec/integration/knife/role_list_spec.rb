@@ -32,12 +32,12 @@ describe "knife role list", :workstation do
     end
 
     it "lists all cookbooks" do
-      knife("role list").should_succeed <<EOM
-car
-cat
-cdr
-cons
-EOM
+      knife("role list").should_succeed <<~EOM
+        car
+        cat
+        cdr
+        cons
+      EOM
     end
 
   end

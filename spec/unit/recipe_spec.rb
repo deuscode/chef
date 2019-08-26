@@ -3,7 +3,7 @@
 # Author:: Christopher Walters (<cw@chef.io>)
 # Author:: Tim Hinderliter (<tim@chef.io>)
 # Author:: Seth Chisamore (<schisamo@chef.io>)
-# Copyright:: Copyright 2008-2017, Chef Software Inc.
+# Copyright:: Copyright 2008-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -94,7 +94,7 @@ describe Chef::Recipe do
           end
         end
 
-        expect(run_context.resource_collection.map { |r| r.name }).to eql(%w{monkey dog cat})
+        expect(run_context.resource_collection.map(&:name)).to eql(%w{monkey dog cat})
       end
 
       it "should return the new resource after creating it" do
@@ -110,12 +110,12 @@ describe Chef::Recipe do
         it "locate resource for particular platform" do
           ShaunTheSheep = Class.new(Chef::Resource)
           ShaunTheSheep.resource_name :shaun_the_sheep
-          ShaunTheSheep.provides :laughter, :platform => ["television"]
+          ShaunTheSheep.provides :laughter, platform: ["television"]
           node.automatic[:platform] = "television"
           node.automatic[:platform_version] = "123"
           res = recipe.laughter "timmy"
           expect(res.name).to eql("timmy")
-          res.kind_of?(ShaunTheSheep)
+          res.is_a?(ShaunTheSheep)
         end
 
         it "locate a resource for all platforms" do
@@ -124,7 +124,7 @@ describe Chef::Recipe do
           YourMom.provides :love_and_caring
           res = recipe.love_and_caring "mommy"
           expect(res.name).to eql("mommy")
-          res.kind_of?(YourMom)
+          res.is_a?(YourMom)
         end
 
         describe "when there is more than one resource that resolves on a node" do
@@ -141,16 +141,16 @@ describe Chef::Recipe do
             Object.send(:remove_const, :TottenhamHotspur)
           end
 
-          it "selects the first one alphabetically" do
+          it "selects the last-writer wins" do
             Sounders.provides :football, platform: "nbc_sports"
             TottenhamHotspur.provides :football, platform: "nbc_sports"
 
             res1 = recipe.football "club world cup"
             expect(res1.name).to eql("club world cup")
-            expect(res1).to be_a_kind_of(Sounders)
+            expect(res1).to be_a_kind_of(TottenhamHotspur)
           end
 
-          it "selects the first one alphabetically even if the declaration order is reversed" do
+          it "selects the last-writer wins even if the declaration order is reversed" do
             TottenhamHotspur.provides :football2, platform: "nbc_sports"
             Sounders.provides :football2, platform: "nbc_sports"
 
@@ -183,7 +183,7 @@ describe Chef::Recipe do
 
       it "does not add the resource to the resource collection" do
         zm_resource # force let binding evaluation
-        expect { run_context.resource_collection.resources(:zen_master => "klopp") }.to raise_error(Chef::Exceptions::ResourceNotFound)
+        expect { run_context.resource_collection.resources(zen_master: "klopp") }.to raise_error(Chef::Exceptions::ResourceNotFound)
       end
     end
 
@@ -238,7 +238,7 @@ describe Chef::Recipe do
 
       it "adds the resource to the resource collection" do
         zm_resource # force let binding evaluation
-        expect(run_context.resource_collection.resources(:zen_master => "klopp")).to eq(zm_resource)
+        expect(run_context.resource_collection.resources(zen_master: "klopp")).to eq(zm_resource)
       end
 
       it "will insert another resource if create_if_missing is not set (cloned resource as of Chef-12)" do
@@ -339,7 +339,7 @@ describe Chef::Recipe do
     describe "resource definitions" do
       it "should execute defined resources" do
         crow_define = Chef::ResourceDefinition.new
-        crow_define.define :crow, :peace => false, :something => true do
+        crow_define.define :crow, peace: false, something: true do
           zen_master "lao tzu" do
             peace params[:peace]
             something params[:something]
@@ -349,13 +349,13 @@ describe Chef::Recipe do
         recipe.crow "mine" do
           peace true
         end
-        expect(run_context.resource_collection.resources(:zen_master => "lao tzu").name).to eql("lao tzu")
-        expect(run_context.resource_collection.resources(:zen_master => "lao tzu").something).to eql(true)
+        expect(run_context.resource_collection.resources(zen_master: "lao tzu").name).to eql("lao tzu")
+        expect(run_context.resource_collection.resources(zen_master: "lao tzu").something).to eql(true)
       end
 
       it "should set the node on defined resources" do
         crow_define = Chef::ResourceDefinition.new
-        crow_define.define :crow, :peace => false, :something => true do
+        crow_define.define :crow, peace: false, something: true do
           zen_master "lao tzu" do
             peace params[:peace]
             something params[:something]
@@ -366,12 +366,12 @@ describe Chef::Recipe do
         recipe.crow "mine" do
           something node[:foo]
         end
-        expect(recipe.resources(:zen_master => "lao tzu").something).to eql(false)
+        expect(recipe.resources(zen_master: "lao tzu").something).to eql(false)
       end
 
       it "should return the last statement in the definition as the retval" do
         crow_define = Chef::ResourceDefinition.new
-        crow_define.define :crow, :peace => false, :something => true do
+        crow_define.define :crow, peace: false, something: true do
           "the return val"
         end
         run_context.definitions[:crow] = crow_define
@@ -390,9 +390,9 @@ describe Chef::Recipe do
   zen_master "gnome" do
     peace = true
   end
-  CODE
+      CODE
       expect { recipe.instance_eval(code) }.not_to raise_error
-      expect(recipe.resources(:zen_master => "gnome").name).to eql("gnome")
+      expect(recipe.resources(zen_master: "gnome").name).to eql("gnome")
     end
   end
 
@@ -408,7 +408,7 @@ describe Chef::Recipe do
   describe "from_file" do
     it "should load a resource from a ruby file" do
       recipe.from_file(File.join(CHEF_SPEC_DATA, "recipes", "test.rb"))
-      res = recipe.resources(:file => "/etc/nsswitch.conf")
+      res = recipe.resources(file: "/etc/nsswitch.conf")
       expect(res.name).to eql("/etc/nsswitch.conf")
       expect(res.action).to eql([:create])
       expect(res.owner).to eql("root")
@@ -426,7 +426,7 @@ describe Chef::Recipe do
       expect(node).to receive(:loaded_recipe).with(:openldap, "gigantor")
       allow(run_context).to receive(:unreachable_cookbook?).with(:openldap).and_return(false)
       run_context.include_recipe "openldap::gigantor"
-      res = run_context.resource_collection.resources(:cat => "blanket")
+      res = run_context.resource_collection.resources(cat: "blanket")
       expect(res.name).to eql("blanket")
       expect(res.pretty_kitty).to eql(false)
     end
@@ -435,7 +435,7 @@ describe Chef::Recipe do
       expect(node).to receive(:loaded_recipe).with(:openldap, "default")
       allow(run_context).to receive(:unreachable_cookbook?).with(:openldap).and_return(false)
       run_context.include_recipe "openldap"
-      res = run_context.resource_collection.resources(:cat => "blanket")
+      res = run_context.resource_collection.resources(cat: "blanket")
       expect(res.name).to eql("blanket")
       expect(res.pretty_kitty).to eql(true)
     end
@@ -577,11 +577,6 @@ describe Chef::Recipe do
   end
 
   describe "included DSL" do
-    it "should include features from Chef::DSL::Audit" do
-      expect(recipe.singleton_class.included_modules).to include(Chef::DSL::Audit)
-      expect(recipe.respond_to?(:control_group)).to be true
-    end
-
     it "should respond to :ps_credential from Chef::DSL::Powershell" do
       expect(recipe.respond_to?(:ps_credential)).to be true
     end

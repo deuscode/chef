@@ -16,26 +16,26 @@
 # limitations under the License.
 #
 
-require "chef/knife"
+require_relative "../knife"
 
 class Chef
   class Knife
     class RoleEnvRunListRemove < Knife
 
       deps do
-        require "chef/role"
-        require "chef/json_compat"
+        require_relative "../role"
+        require_relative "../json_compat"
       end
 
-      banner "knife role env_run_list remove [ROLE] [ENVIRONMENT] [ENTRIES]"
+      banner "knife role env_run_list remove [ROLE] [ENVIRONMENT] [ENTRIES] (options)"
 
       def remove_from_env_run_list(role, environment, item_to_remove)
         nlist = []
         role.run_list_for(environment).each do |entry|
           nlist << entry unless entry == item_to_remove
-          #unless entry == @name_args[2]
+          # unless entry == @name_args[2]
           #  nlist << entry
-          #end
+          # end
         end
         role.env_run_lists_add(environment => nlist)
       end

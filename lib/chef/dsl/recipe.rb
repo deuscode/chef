@@ -1,7 +1,7 @@
-#--
+#
 # Author:: Adam Jacob (<adam@chef.io>)
 # Author:: Christopher Walters (<cw@chef.io>)
-# Copyright:: Copyright 2008-2017, Chef Software Inc.
+# Copyright:: Copyright 2008-2019, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,17 +17,13 @@
 # limitations under the License.
 #
 
-require "chef/exceptions"
-require "chef/dsl/resources"
-require "chef/dsl/definitions"
-require "chef/dsl/data_query"
-require "chef/dsl/include_recipe"
-require "chef/dsl/registry_helper"
-require "chef/dsl/reboot_pending"
-require "chef/dsl/audit"
-require "chef/dsl/powershell"
-require "chef/dsl/core"
-require "chef/mixin/lazy_module_include"
+require_relative "../exceptions"
+require_relative "resources"
+require_relative "definitions"
+require_relative "include_recipe"
+require_relative "reboot_pending"
+require_relative "core"
+require_relative "../mixin/lazy_module_include"
 
 class Chef
   module DSL
@@ -51,12 +47,8 @@ class Chef
     #
     module Recipe
       include Chef::DSL::Core
-      include Chef::DSL::DataQuery
       include Chef::DSL::IncludeRecipe
-      include Chef::DSL::RegistryHelper
       include Chef::DSL::RebootPending
-      include Chef::DSL::Audit
-      include Chef::DSL::Powershell
       include Chef::DSL::Resources
       include Chef::DSL::Definitions
       extend Chef::Mixin::LazyModuleInclude
@@ -74,19 +66,9 @@ class Chef
       def exec(args)
         raise Chef::Exceptions::ResourceNotFound, "exec was called, but you probably meant to use an execute resource.  If not, please call Kernel#exec explicitly.  The exec block called was \"#{args}\""
       end
-
-      # @deprecated Use Chef::DSL::Recipe instead, will be removed in Chef 13
-      module FullDSL
-        include Chef::DSL::Recipe
-        extend Chef::Mixin::LazyModuleInclude
-      end
     end
   end
 end
 
 # Avoid circular references for things that are only used in instance methods
-require "chef/resource"
-
-# **DEPRECATED**
-# This used to be part of chef/mixin/recipe_definition_dsl_core. Load the file to activate the deprecation code.
-require "chef/mixin/recipe_definition_dsl_core"
+require_relative "../resource"

@@ -16,13 +16,13 @@
 # limitations under the License.
 #
 
-require "chef/provider/windows_script"
+require_relative "windows_script"
 
 class Chef
   class Provider
     class Batch < Chef::Provider::WindowsScript
 
-      provides :batch, os: "windows"
+      provides :batch
 
       def initialize(new_resource, run_context)
         super(new_resource, run_context, ".bat")

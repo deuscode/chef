@@ -16,9 +16,9 @@
 # limitations under the License.
 #
 
-require "mixlib/shellout"
-require "chef/mixin/windows_architecture_helper"
-require "chef/util/powershell/cmdlet_result"
+require "mixlib/shellout" unless defined?(Mixlib::ShellOut::DEFAULT_READ_TIMEOUT)
+require_relative "../../mixin/windows_architecture_helper"
+require_relative "cmdlet_result"
 
 class Chef
   class Util
@@ -48,8 +48,8 @@ class Chef
         attr_reader :output_format
 
         def run(switches = {}, execution_options = {}, *arguments)
-          streams = { :json => CmdletStream.new("json"),
-                      :verbose => CmdletStream.new("verbose"),
+          streams = { json: CmdletStream.new("json"),
+                      verbose: CmdletStream.new("verbose"),
                     }
 
           arguments_string = arguments.join(" ")
@@ -58,7 +58,7 @@ class Chef
 
           json_depth = 5
 
-          if @json_format && @output_format_options.has_key?(:depth)
+          if @json_format && @output_format_options.key?(:depth)
             json_depth = @output_format_options[:depth]
           end
 
@@ -74,7 +74,7 @@ class Chef
                            "#{arguments_string} #{redirections}"\
                            "#{json_command}\";if ( ! $? ) { exit 1 }"
 
-          augmented_options = { :returns => [0], :live_stream => false }.merge(execution_options)
+          augmented_options = { returns: [0], live_stream: false }.merge(execution_options)
           command = Mixlib::ShellOut.new(command_string, augmented_options)
 
           status = nil
@@ -89,8 +89,8 @@ class Chef
         def run!(switches = {}, execution_options = {}, *arguments)
           result = run(switches, execution_options, arguments)
 
-          if ! result.succeeded?
-            raise Chef::Exceptions::PowershellCmdletException, "Powershell Cmdlet failed: #{result.stderr}"
+          unless result.succeeded?
+            raise Chef::Exceptions::PowershellCmdletException, "PowerShell Cmdlet failed: #{result.stderr}"
           end
 
           result

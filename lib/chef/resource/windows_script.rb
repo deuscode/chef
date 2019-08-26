@@ -16,9 +16,9 @@
 # limitations under the License.
 #
 
-require "chef/platform/query_helpers"
-require "chef/resource/script"
-require "chef/mixin/windows_architecture_helper"
+require_relative "../platform/query_helpers"
+require_relative "script"
+require_relative "../mixin/windows_architecture_helper"
 
 class Chef
   class Resource
@@ -41,11 +41,11 @@ class Chef
       public
 
       def architecture(arg = nil)
-        assert_architecture_compatible!(arg) if ! arg.nil?
+        assert_architecture_compatible!(arg) unless arg.nil?
         result = set_or_return(
           :architecture,
           arg,
-          :kind_of => Symbol
+          kind_of: Symbol
         )
       end
 

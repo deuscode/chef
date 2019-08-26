@@ -21,29 +21,43 @@ require "spec_helper"
 describe Chef::Resource::MsuPackage do
   let(:resource) { Chef::Resource::MsuPackage.new("test_pkg") }
 
-  it "creates a new Chef::Resource::MsuPackage" do
-    expect(resource).to be_a_kind_of(Chef::Resource)
+  it "is a subclass of Chef::Resource::Package" do
     expect(resource).to be_a_kind_of(Chef::Resource::Package)
-    expect(resource).to be_a_instance_of(Chef::Resource::MsuPackage)
   end
 
   it "sets resource name as :msu_package" do
     expect(resource.resource_name).to eql(:msu_package)
   end
 
-  it "sets the source as it's name" do
-    expect(resource.source).to eql("test_pkg")
-  end
-
   it "sets the default action as :install" do
-    expect(resource.action).to eql(:install)
+    expect(resource.action).to eql([:install])
   end
 
-  it "raises error if invalid action is given" do
-    expect { resource.action "abc" }.to raise_error(Chef::Exceptions::ValidationFailed)
+  it "supports :install, :lock, :purge, :reconfig, :remove, :unlock, :upgrade actions" do
+    expect { resource.action :install }.not_to raise_error
+    expect { resource.action :lock }.not_to raise_error
+    expect { resource.action :purge }.not_to raise_error
+    expect { resource.action :reconfig }.not_to raise_error
+    expect { resource.action :remove }.not_to raise_error
+    expect { resource.action :unlock }.not_to raise_error
+    expect { resource.action :upgrade }.not_to raise_error
   end
 
-  it "coerce its name to a package_name" do
+  it "coerces name property to package_name property" do
     expect(resource.package_name).to eql("test_pkg")
+  end
+
+  it "coerces name property to a source property if source not provided" do
+    expect(resource.source).to end_with("test_pkg")
+  end
+
+  it "coerces name property to a source property if source not provided and package_name is" do
+    resource.package_name("package.msu")
+    expect(resource.source).to end_with("package.msu")
+  end
+
+  it "coerces source property if it does not looks like a path" do
+    resource.source("package.msu")
+    expect(resource.source).not_to eq("package.msu")
   end
 end

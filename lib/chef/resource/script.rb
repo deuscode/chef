@@ -17,13 +17,19 @@
 # limitations under the License.
 #
 
-require "chef/resource/execute"
-require "chef/provider/script"
+require_relative "execute"
 
 class Chef
   class Resource
     class Script < Chef::Resource::Execute
+      resource_name :script
+
       identity_attr :name
+
+      description "Use the script resource to execute scripts using a specified interpreter, such as Bash, csh, Perl, Python, or Ruby."\
+                  " This resource may also use any of the actions and properties that are available to the execute resource. Commands"\
+                  " that are executed with this resource are (by their nature) not idempotent, as they are typically unique to the"\
+                  " environment in which they are run. Use not_if and only_if to guard this resource for idempotence."
 
       def initialize(name, run_context = nil)
         super
@@ -33,10 +39,10 @@ class Chef
 
       # FIXME: remove this and use an execute sub-resource instead of inheriting from Execute
       def command(arg = nil)
-        unless arg.nil?
-          raise Chef::Exceptions::Script, "Do not use the command attribute on a #{resource_name} resource, use the 'code' attribute instead."
-        end
         super
+        unless arg.nil?
+          raise Chef::Exceptions::Script, "Do not use the command property on a #{resource_name} resource, use the 'code' property instead."
+        end
       end
 
       property :code, String, required: true

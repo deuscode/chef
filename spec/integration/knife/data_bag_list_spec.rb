@@ -32,11 +32,11 @@ describe "knife data bag list", :workstation do
     end
 
     it "knife data bag list shows all the cookbooks" do
-      knife("data bag list").should_succeed <<EOM
-canteloupe
-rocket
-x
-EOM
+      knife("data bag list").should_succeed <<~EOM
+        canteloupe
+        rocket
+        x
+      EOM
     end
 
   end

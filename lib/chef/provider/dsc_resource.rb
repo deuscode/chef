@@ -15,16 +15,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-require "chef/util/powershell/cmdlet"
-require "chef/util/dsc/local_configuration_manager"
-require "chef/mixin/powershell_type_coercions"
-require "chef/util/dsc/resource_store"
+require_relative "../util/powershell/cmdlet"
+require_relative "../util/dsc/local_configuration_manager"
+require_relative "../mixin/powershell_type_coercions"
+require_relative "../util/dsc/resource_store"
 
 class Chef
   class Provider
     class DscResource < Chef::Provider
       include Chef::Mixin::PowershellTypeCoercions
-      provides :dsc_resource, os: "windows"
+      provides :dsc_resource
       def initialize(new_resource, run_context)
         super
         @new_resource = new_resource
@@ -34,7 +34,7 @@ class Chef
       end
 
       def action_run
-        if ! test_resource
+        unless test_resource
           converge_by(generate_description) do
             result = set_resource
             reboot_if_required
@@ -42,16 +42,15 @@ class Chef
         end
       end
 
-      def load_current_resource
-      end
+      def load_current_resource; end
 
       def define_resource_requirements
         requirements.assert(:run) do |a|
           a.assertion { supports_dsc_invoke_resource? }
-          err = ["You must have Powershell version >= 5.0.10018.0 to use dsc_resource."]
+          err = ["You must have PowerShell version >= 5.0.10018.0 to use dsc_resource."]
           a.failure_message Chef::Exceptions::ProviderNotFound,
             err
-          a.whyrun err + ["Assuming a previous resource installs Powershell 5.0.10018.0 or higher."]
+          a.whyrun err + ["Assuming a previous resource installs PowerShell 5.0.10018.0 or higher."]
           a.block_action!
         end
         requirements.assert(:run) do |a|
@@ -169,7 +168,7 @@ class Chef
           "Invoke-DscResource #{switches}",
           output_format
         )
-        cmdlet.run!({}, { :timeout => new_resource.timeout })
+        cmdlet.run!({}, { timeout: new_resource.timeout })
       end
 
       def return_dsc_resource_result(result, property_name)
@@ -196,10 +195,10 @@ class Chef
         unless @reboot_resource.nil?
           case reboot_action
           when :nothing
-            Chef::Log.debug("A reboot was requested by the DSC resource, but reboot_action is :nothing.")
-            Chef::Log.debug("This dsc_resource will not reboot the node.")
+            logger.trace("A reboot was requested by the DSC resource, but reboot_action is :nothing.")
+            logger.trace("This dsc_resource will not reboot the node.")
           else
-            Chef::Log.debug("Requesting node reboot with #{reboot_action}.")
+            logger.trace("Requesting node reboot with #{reboot_action}.")
             @reboot_resource.run_action(reboot_action)
           end
         end

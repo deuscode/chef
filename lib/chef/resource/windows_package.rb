@@ -16,10 +16,10 @@
 # limitations under the License.
 #
 
-require "chef/mixin/uris"
-require "chef/resource/package"
-require "chef/provider/package/windows"
-require "chef/win32/error" if RUBY_PLATFORM =~ /mswin|mingw|windows/
+require_relative "../mixin/uris"
+require_relative "package"
+require_relative "../provider/package/windows"
+require_relative "../win32/error" if RUBY_PLATFORM =~ /mswin|mingw|windows/
 
 class Chef
   class Resource
@@ -27,8 +27,11 @@ class Chef
       include Chef::Mixin::Uris
 
       resource_name :windows_package
-      provides :windows_package, os: "windows"
+      provides(:windows_package) { true }
       provides :package, os: "windows"
+
+      description "Use the windows_package resource to manage Microsoft Installer Package (MSI) packages for the Microsoft Windows platform."
+      introduced "11.12"
 
       allowed_actions :install, :remove
 
@@ -46,11 +49,11 @@ class Chef
       # In the past we accepted return code 127 for an unknown reason and 42 because of a bug
       property :returns, [ String, Integer, Array ], default: [ 0 ], desired_state: false
       property :source, String,
-                coerce: (proc do |s|
-                  unless s.nil?
-                    uri_scheme?(s) ? s : Chef::Util::PathHelper.canonical_path(s, false)
-                  end
-                end)
+        coerce: (proc do |s|
+          unless s.nil?
+            uri_scheme?(s) ? s : Chef::Util::PathHelper.canonical_path(s, false)
+          end
+        end)
       property :checksum, String, desired_state: false
       property :remote_file_attributes, Hash, desired_state: false
     end

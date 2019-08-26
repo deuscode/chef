@@ -16,16 +16,17 @@
 # limitations under the License.
 #
 
-require "chef/resource/package"
-require "chef/provider/package/rpm"
+require_relative "package"
 
 class Chef
   class Resource
     class RpmPackage < Chef::Resource::Package
       resource_name :rpm_package
-      provides :rpm_package, os: %w{linux aix}
+      provides :rpm_package
 
-      property :allow_downgrade, [ true, false ], default: false, desired_state: false
+      description "Use the rpm_package resource to manage packages for the RPM Package Manager platform."
+
+      property :allow_downgrade, [ true, false ], default: true, desired_state: false
 
     end
   end

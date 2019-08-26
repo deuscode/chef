@@ -1,5 +1,5 @@
 # Author:: Daniel DeLeo (<dan@chef.io>)
-# Copyright:: Copyright 2015-2016, Chef Software Inc.
+# Copyright:: Copyright 2015-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,12 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-require "forwardable"
-require "chef/mixin/versioned_api"
-require "chef/util/path_helper"
-require "chef/cookbook/manifest_v0"
-require "chef/cookbook/manifest_v2"
-require "chef/log"
+require "forwardable" unless defined?(Forwardable)
+require_relative "mixin/versioned_api"
+require_relative "util/path_helper"
+require_relative "cookbook/manifest_v0"
+require_relative "cookbook/manifest_v2"
+require_relative "log"
 
 class Chef
 
@@ -40,7 +40,7 @@ class Chef
     def_delegator :@cookbook_version, :frozen_version?
 
     # Create a new CookbookManifest object for the given `cookbook_version`.
-    # You can subsequently call #to_hash to get a Hash representation of the
+    # You can subsequently call #to_h to get a Hash representation of the
     # cookbook_version in the "manifest" format, or #to_json to get a JSON
     # representation of the cookbook_version.
     #
@@ -119,12 +119,14 @@ class Chef
       @policy_mode
     end
 
-    def to_hash
-      CookbookManifestVersions.to_hash(self)
+    def to_h
+      CookbookManifestVersions.to_h(self)
     end
 
+    alias_method :to_hash, :to_h
+
     def to_json(*a)
-      result = to_hash
+      result = to_h
       result["json_class"] = "Chef::CookbookVersion"
       Chef::JSONCompat.to_json(result, *a)
     end
@@ -170,6 +172,7 @@ class Chef
 
     def files_for(part)
       return root_files if part.to_s == "root_files"
+
       manifest[:all_files].select do |file|
         seg = file[:name].split("/")[0]
         part.to_s == seg
@@ -177,11 +180,12 @@ class Chef
     end
 
     def each_file(excluded_parts: [], &block)
-      excluded_parts = Array(excluded_parts).map { |p| p.to_s }
+      excluded_parts = Array(excluded_parts).map(&:to_s)
 
       manifest[:all_files].each do |file|
         seg = file[:name].split("/")[0]
         next if excluded_parts.include?(seg)
+
         yield file if block_given?
       end
     end
@@ -204,7 +208,8 @@ class Chef
 
     def root_files
       manifest[:all_files].select do |file|
-        file[:name].split("/").length == 1
+        segment, name = file[:name].split("/")
+        name.nil? || segment == "root_files"
       end
     end
 
@@ -218,7 +223,7 @@ class Chef
     # See #preferred_manifest_record for a description an individual manifest record.
     def generate_manifest
       manifest = Mash.new({
-        all_files: Array.new,
+        all_files: [],
       })
       @checksums = {}
 
@@ -235,13 +240,13 @@ class Chef
         csum = checksum_cookbook_file(file)
         @checksums[csum] = file
         rs = Mash.new({
-          :name => name,
-          :path => path,
-          :checksum => csum,
-          :specificity => specificity,
+          name: name,
+          path: path,
+          checksum: csum,
+          specificity: specificity,
           # full_path is not a part of the normal manifest, but is very useful to keep around.
           # uploaders should strip this out.
-          :full_path => file,
+          full_path: file,
         })
 
         manifest[:all_files] << rs
@@ -271,7 +276,7 @@ class Chef
         next if parts[0] == ".."
 
         # if we have a root_file, such as metadata.rb, the first part will be "."
-        return [ pathname.to_s, pathname.to_s, "default" ] if parts.length == 1
+        return [ "root_files/#{pathname}", pathname.to_s, "default" ] if parts.length == 1
 
         segment = parts[0]
 
@@ -320,5 +325,6 @@ class Chef
 
     def_versioned_delegator :from_hash
     def_versioned_delegator :to_hash
+    def_versioned_delegator :to_h
   end
 end

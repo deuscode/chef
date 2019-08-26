@@ -16,23 +16,23 @@
 # limitations under the License.
 #
 
-require "chef/knife"
+require_relative "../knife"
 
 class Chef
   class Knife
     class RoleCreate < Knife
 
       deps do
-        require "chef/role"
-        require "chef/json_compat"
+        require_relative "../role"
+        require_relative "../json_compat"
       end
 
       banner "knife role create ROLE (options)"
 
       option :description,
-        :short => "-d DESC",
-        :long => "--description DESC",
-        :description => "The role description"
+        short: "-d DESC",
+        long: "--description DESC",
+        description: "The role description."
 
       def run
         @role_name = @name_args[0]

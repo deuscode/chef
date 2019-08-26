@@ -16,8 +16,8 @@
 # limitations under the License.
 #
 
-require "chef/provider/script"
-require "chef/mixin/windows_architecture_helper"
+require_relative "script"
+require_relative "../mixin/windows_architecture_helper"
 
 class Chef
   class Provider
@@ -58,7 +58,7 @@ class Chef
         rescue
           raise
         ensure
-          if ! wow64_redirection_state.nil?
+          unless wow64_redirection_state.nil?
             restore_wow64_file_redirection(@run_context.node, wow64_redirection_state)
           end
         end

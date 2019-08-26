@@ -17,96 +17,51 @@
 # limitations under the License.
 #
 
-require "chef/resource"
+require_relative "../resource"
 
 class Chef
   class Resource
     class Mdadm < Chef::Resource
+      resource_name :mdadm
 
-      identity_attr :raid_device
-
-      state_attrs :devices, :level, :chunk
+      description "Use the mdadm resource to manage RAID devices in a Linux environment using the mdadm utility. The mdadm resource"\
+                  " will create and assemble an array, but it will not create the config file that is used to persist the array upon"\
+                  " reboot. If the config file is required, it must be done by specifying a template with the correct array layout,"\
+                  " and then by using the mount provider to create a file systems table (fstab) entry."
 
       default_action :create
       allowed_actions :create, :assemble, :stop
 
-      def initialize(name, run_context = nil)
-        super
+      property :chunk, Integer,
+        default: 16,
+        description: "The chunk size. This property should not be used for a RAID 1 mirrored pair (i.e. when the level property is set to 1)."
 
-        @chunk = 16
-        @devices = []
-        @exists = false
-        @level = 1
-        @metadata = "0.90"
-        @bitmap = nil
-        @raid_device = name
-        @layout = nil
-      end
+      property :devices, Array,
+        default: lazy { [] },
+        description: "The devices to be part of a RAID array."
 
-      def chunk(arg = nil)
-        set_or_return(
-          :chunk,
-          arg,
-          :kind_of => [ Integer ]
-        )
-      end
+      # @todo this should get refactored away
+      property :exists, [ TrueClass, FalseClass ],
+        default: false,
+        skip_docs: true
 
-      def devices(arg = nil)
-        set_or_return(
-          :devices,
-          arg,
-          :kind_of => [ Array ]
-        )
-      end
+      property :level, Integer,
+        default: 1,
+        description: "The RAID level."
 
-      def exists(arg = nil)
-        set_or_return(
-          :exists,
-          arg,
-          :kind_of => [ TrueClass, FalseClass ]
-        )
-      end
+      property :metadata, String,
+        default: "0.90",
+        description: "The superblock type for RAID metadata."
 
-      def level(arg = nil)
-        set_or_return(
-          :level,
-          arg,
-          :kind_of => [ Integer ]
-        )
-      end
+      property :bitmap, String,
+        description: "The path to a file in which a write-intent bitmap is stored."
 
-      def metadata(arg = nil)
-        set_or_return(
-          :metadata,
-          arg,
-          :kind_of => [ String ]
-        )
-      end
+      property :raid_device, String,
+        identity: true, name_property: true,
+        description: "An optional property to specify the name of the RAID device if it differs from the resource block's name."
 
-      def bitmap(arg = nil)
-        set_or_return(
-          :bitmap,
-          arg,
-          :kind_of => [ String ]
-        )
-      end
-
-      def raid_device(arg = nil)
-        set_or_return(
-          :raid_device,
-          arg,
-          :kind_of => [ String ]
-        )
-      end
-
-      def layout(arg = nil)
-        set_or_return(
-          :layout,
-          arg,
-          :kind_of => [ String ]
-        )
-      end
-
+      property :layout, String,
+        description: "The RAID5 parity algorithm. Possible values: left-asymmetric (or la), left-symmetric (or ls), right-asymmetric (or ra), or right-symmetric (or rs)."
     end
   end
 end

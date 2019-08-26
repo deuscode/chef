@@ -1,7 +1,7 @@
 #--
 # Author:: Adam Jacob (<adam@chef.io>)
 # Author:: Christopher Walters (<cw@chef.io>)
-# Copyright:: Copyright 2008-2017, Chef Software Inc.
+# Copyright:: Copyright 2008-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,9 +17,9 @@
 # limitations under the License.
 #
 
-require "chef/dsl/recipe"
-require "chef/mixin/from_file"
-require "chef/mixin/deprecation"
+require_relative "dsl/recipe"
+require_relative "mixin/from_file"
+require_relative "mixin/deprecation"
 
 class Chef
   # == Chef::Recipe
@@ -47,6 +47,7 @@ class Chef
         [ $1.to_sym, $2 ]
       when /^::(.+)/
         raise "current_cookbook is nil, cannot resolve #{recipe_name}" if current_cookbook.nil?
+
         [ current_cookbook.to_sym, $1 ]
       else
         [ recipe_name.to_sym, "default" ]
@@ -58,7 +59,7 @@ class Chef
       @recipe_name = recipe_name
       @run_context = run_context
       # TODO: 5/19/2010 cw/tim: determine whether this can be removed
-      @params = Hash.new
+      @params = {}
     end
 
     # Used in DSL mixins
@@ -66,30 +67,9 @@ class Chef
       run_context.node
     end
 
-    # Used by the DSL to look up resources when executing in the context of a
-    # recipe.
-    def resources(*args)
-      run_context.resource_collection.find(*args)
-    end
-
     # This was moved to Chef::Node#tag, redirecting here for compatibility
     def tag(*tags)
       run_context.node.tag(*tags)
-    end
-
-    # Returns true if the node is tagged with *all* of the supplied +tags+.
-    #
-    # === Parameters
-    # tags<Array>:: A list of tags
-    #
-    # === Returns
-    # true<TrueClass>:: If all the parameters are present
-    # false<FalseClass>:: If any of the parameters are missing
-    def tagged?(*tags)
-      tags.each do |tag|
-        return false unless run_context.node.tags.include?(tag)
-      end
-      true
     end
 
     # Removes the list of tags from the node.

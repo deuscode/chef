@@ -1,6 +1,6 @@
 #
 # Author:: Kaustubh Deorukhkar (<kaustubh@clogeny.com>)
-# Copyright:: Copyright 2013-2016, Chef Software Inc.
+# Copyright:: Copyright 2013-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,13 +16,14 @@
 # limitations under the License.
 #
 
+require "spec_helper"
 require "functional/resource/base"
 require "chef/mixin/shell_out"
 
 # run this test only for following platforms.
-include_flag = !(%w{ubuntu centos aix}.include?(ohai[:platform]))
+include_flag = !(%w{amazon debian aix}.include?(ohai[:platform_family]) || (ohai[:platform_family] == "rhel" && ohai[:platform_version].to_i < 7))
 
-describe Chef::Resource::Ifconfig, :requires_root, :skip_travis, :external => include_flag do
+describe Chef::Resource::Ifconfig, :requires_root, external: include_flag do
   # This test does not work in travis because there is no eth0
 
   include Chef::Mixin::ShellOut
@@ -52,7 +53,7 @@ describe Chef::Resource::Ifconfig, :requires_root, :skip_travis, :external => in
   end
 
   def fetch_first_interface_name
-    shell_out("ifconfig | grep Ethernet | head -1 | cut -d' ' -f1").stdout.strip
+    shell_out("ip link list |grep UP|grep -vi loop|head -1|cut -d':' -f 2 |cut -d'@' -f 1").stdout.strip
   end
 
   # **Caution: any updates to core interfaces can be risky.
@@ -121,7 +122,7 @@ describe Chef::Resource::Ifconfig, :requires_root, :skip_travis, :external => in
   end
 
   exclude_test = ohai[:platform] != "ubuntu"
-  describe "#action_add", :external => exclude_test do
+  describe "#action_add", external: exclude_test do
     after do
       new_resource.run_action(:delete)
     end
@@ -133,7 +134,7 @@ describe Chef::Resource::Ifconfig, :requires_root, :skip_travis, :external => in
     end
   end
 
-  describe "#action_enable", :external => exclude_test do
+  describe "#action_enable", external: exclude_test do
     after do
       new_resource.run_action(:disable)
     end
@@ -144,7 +145,7 @@ describe Chef::Resource::Ifconfig, :requires_root, :skip_travis, :external => in
     end
   end
 
-  describe "#action_disable", :external => exclude_test do
+  describe "#action_disable", external: exclude_test do
     before do
       setup_enable_interface(new_resource)
       new_resource.run_action(:enable)
@@ -156,7 +157,7 @@ describe Chef::Resource::Ifconfig, :requires_root, :skip_travis, :external => in
     end
   end
 
-  describe "#action_delete", :external => exclude_test do
+  describe "#action_delete", external: exclude_test do
     before do
       setup_add_interface(new_resource)
       new_resource.run_action(:add)

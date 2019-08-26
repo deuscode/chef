@@ -16,9 +16,9 @@
 # limitations under the License.
 #
 
-require "chef/knife"
-require "chef/knife/core/node_presenter"
-require "addressable/uri"
+require_relative "../knife"
+require_relative "core/node_presenter"
+require "addressable/uri" unless defined?(Addressable::URI)
 
 class Chef
   class Knife
@@ -27,10 +27,10 @@ class Chef
       include Knife::Core::MultiAttributeReturnOption
 
       deps do
-        require "chef/node"
-        require "chef/environment"
-        require "chef/api_client"
-        require "chef/search/query"
+        require_relative "../node"
+        require_relative "../environment"
+        require_relative "../api_client"
+        require_relative "../search/query"
       end
 
       include Knife::Core::NodeFormattingOptions
@@ -38,38 +38,38 @@ class Chef
       banner "knife search INDEX QUERY (options)"
 
       option :start,
-        :short => "-b ROW",
-        :long => "--start ROW",
-        :description => "The row to start returning results at",
-        :default => 0,
-        :proc => lambda { |i| i.to_i }
+        short: "-b ROW",
+        long: "--start ROW",
+        description: "The row to start returning results at.",
+        default: 0,
+        proc: lambda { |i| i.to_i }
 
       option :rows,
-        :short => "-R INT",
-        :long => "--rows INT",
-        :description => "The number of rows to return",
-        :default => nil,
-        :proc => lambda { |i| i.to_i }
+        short: "-R INT",
+        long: "--rows INT",
+        description: "The number of rows to return.",
+        default: nil,
+        proc: lambda { |i| i.to_i }
 
       option :run_list,
-        :short => "-r",
-        :long => "--run-list",
-        :description => "Show only the run list"
+        short: "-r",
+        long: "--run-list",
+        description: "Show only the run list."
 
       option :id_only,
-        :short => "-i",
-        :long => "--id-only",
-        :description => "Show only the ID of matching objects"
+        short: "-i",
+        long: "--id-only",
+        description: "Show only the ID of matching objects."
 
       option :query,
-        :short => "-q QUERY",
-        :long => "--query QUERY",
-        :description => "The search query; useful to protect queries starting with -"
+        short: "-q QUERY",
+        long: "--query QUERY",
+        description: "The search query; useful to protect queries starting with -."
 
       option :filter_result,
-        :short => "-f FILTER",
-        :long => "--filter-result FILTER",
-        :description => "Only return specific attributes of the matching objects; for example: \"ServerName=name, Kernel=kernel.version\""
+        short: "-f FILTER",
+        long: "--filter-result FILTER",
+        description: "Only return specific attributes of the matching objects; for example: \"ServerName=name, Kernel=kernel.version\"."
 
       def run
         read_cli_args
@@ -83,7 +83,7 @@ class Chef
         result_items = []
         result_count = 0
 
-        search_args = Hash.new
+        search_args = {}
         search_args[:fuzz] = true
         search_args[:start] = config[:start] if config[:start]
         search_args[:rows] = config[:rows] if config[:rows]
@@ -91,12 +91,16 @@ class Chef
           search_args[:filter_result] = create_result_filter(config[:filter_result])
         elsif (not ui.config[:attribute].nil?) && (not ui.config[:attribute].empty?)
           search_args[:filter_result] = create_result_filter_from_attributes(ui.config[:attribute])
+        elsif config[:id_only]
+          search_args[:filter_result] = create_result_filter_from_attributes([])
         end
 
         begin
           q.search(@type, @query, search_args) do |item|
-            formatted_item = Hash.new
-            if item.is_a?(Hash)
+            formatted_item = {}
+            if config[:id_only]
+              formatted_item = format_for_display({ "id" => item["__display_name"] })
+            elsif item.is_a?(Hash)
               # doing a little magic here to set the correct name
               formatted_item[item["__display_name"]] = item.reject { |k| k == "__display_name" }
             else
@@ -105,14 +109,14 @@ class Chef
             result_items << formatted_item
             result_count += 1
           end
-        rescue Net::HTTPServerException => e
+        rescue Net::HTTPClientException => e
           msg = Chef::JSONCompat.from_json(e.response.body)["error"].first
           ui.error("knife search failed: #{msg}")
           exit 99
         end
 
         if ui.interchange?
-          output({ :results => result_count, :rows => result_items })
+          output({ results: result_count, rows: result_items })
         else
           ui.log "#{result_count} items found"
           ui.log("\n")
@@ -165,7 +169,7 @@ class Chef
       # and the path is an array with the path elements as strings (in order)
       # See lib/chef/search/query.rb for more examples of this.
       def create_result_filter(filter_string)
-        final_filter = Hash.new
+        final_filter = {}
         filter_string.delete!(" ")
         filters = filter_string.split(",")
         filters.each do |f|
@@ -176,7 +180,7 @@ class Chef
       end
 
       def create_result_filter_from_attributes(filter_array)
-        final_filter = Hash.new
+        final_filter = {}
         filter_array.each do |f|
           final_filter[f] = f.split(".")
         end

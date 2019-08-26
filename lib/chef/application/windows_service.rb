@@ -16,19 +16,20 @@
 # limitations under the License.
 #
 
-require "chef"
-require "chef/monologger"
-require "chef/application"
-require "chef/client"
-require "chef/config"
-require "chef/handler/error_report"
-require "chef/log"
-require "chef/http"
-require "mixlib/cli"
-require "socket"
-require "uri"
+require_relative "../../chef"
+require_relative "../monologger"
+require_relative "../application"
+require_relative "../client"
+require_relative "../config"
+require_relative "../handler/error_report"
+require_relative "../log"
+require_relative "../http"
+require "mixlib/cli" unless defined?(Mixlib::CLI)
+require "socket" unless defined?(Socket)
+require "uri" unless defined?(URI)
 require "win32/daemon"
-require "chef/mixin/shell_out"
+require_relative "../mixin/shell_out"
+require_relative "../dist"
 
 class Chef
   class Application
@@ -37,36 +38,36 @@ class Chef
       include Chef::Mixin::ShellOut
 
       option :config_file,
-        :short => "-c CONFIG",
-        :long => "--config CONFIG",
-        :default => "#{ENV['SYSTEMDRIVE']}/chef/client.rb",
-        :description => ""
+        short: "-c CONFIG",
+        long: "--config CONFIG",
+        default: "#{ENV["SYSTEMDRIVE"]}/chef/client.rb",
+        description: "The configuration file to use for #{Chef::Dist::PRODUCT} runs."
 
       option :log_location,
-        :short        => "-L LOGLOCATION",
-        :long         => "--logfile LOGLOCATION",
-        :description  => "Set the log file location"
+        short: "-L LOGLOCATION",
+        long: "--logfile LOGLOCATION",
+        description: "Set the log file location."
 
       option :splay,
-        :short        => "-s SECONDS",
-        :long         => "--splay SECONDS",
-        :description  => "The splay time for running at intervals, in seconds",
-        :proc         => lambda { |s| s.to_i }
+        short: "-s SECONDS",
+        long: "--splay SECONDS",
+        description: "The splay time for running at intervals, in seconds.",
+        proc: lambda { |s| s.to_i }
 
       option :interval,
-        :short        => "-i SECONDS",
-        :long         => "--interval SECONDS",
-        :description  => "Set the number of seconds to wait between chef-client runs",
-        :proc         => lambda { |s| s.to_i }
+        short: "-i SECONDS",
+        long: "--interval SECONDS",
+        description: "Set the number of seconds to wait between #{Chef::Dist::PRODUCT} runs.",
+        proc: lambda { |s| s.to_i }
 
-      DEFAULT_LOG_LOCATION ||= "#{ENV['SYSTEMDRIVE']}/chef/client.log"
+      DEFAULT_LOG_LOCATION ||= "#{ENV["SYSTEMDRIVE"]}/chef/client.log".freeze
 
       def service_init
         @service_action_mutex = Mutex.new
         @service_signal = ConditionVariable.new
 
         reconfigure
-        Chef::Log.info("Chef Client Service initialized")
+        Chef::Log.info("#{Chef::Dist::CLIENT} Service initialized")
       end
 
       def service_main(*startup_parameters)
@@ -78,7 +79,7 @@ class Chef
           # Grab the service_action_mutex to make a chef-client run
           @service_action_mutex.synchronize do
             begin
-              Chef::Log.info("Next chef-client run will happen in #{timeout} seconds")
+              Chef::Log.info("Next #{Chef::Dist::CLIENT} run will happen in #{timeout} seconds")
               @service_signal.wait(@service_action_mutex, timeout)
 
               # Continue only if service is RUNNING
@@ -95,7 +96,7 @@ class Chef
               # run chef-client only if service is in RUNNING state
               next if state != RUNNING
 
-              Chef::Log.info("Chef-Client service is starting a chef-client run...")
+              Chef::Log.info("#{Chef::Dist::CLIENT} service is starting a #{Chef::Dist::CLIENT} run...")
               run_chef_client
             rescue SystemExit => e
               # Do not raise any of the errors here in order to
@@ -109,9 +110,9 @@ class Chef
 
         # Daemon class needs to have all the signal callbacks return
         # before service_main returns.
-        Chef::Log.debug("Giving signal callbacks some time to exit...")
+        Chef::Log.trace("Giving signal callbacks some time to exit...")
         sleep 1
-        Chef::Log.debug("Exiting service...")
+        Chef::Log.trace("Exiting service...")
       end
 
       ################################################################################
@@ -130,12 +131,12 @@ class Chef
             break
           else
             unless run_warning_displayed
-              Chef::Log.info("Currently a chef run is happening on this system.")
-              Chef::Log.info("Service  will stop when run is completed.")
+              Chef::Log.info("Currently a #{Chef::Dist::PRODUCT} run is happening on this system.")
+              Chef::Log.info("Service will stop when run is completed.")
               run_warning_displayed = true
             end
 
-            Chef::Log.debug("Waiting for chef-client run...")
+            Chef::Log.trace("Waiting for #{Chef::Dist::PRODUCT} run...")
             sleep 1
           end
         end
@@ -149,7 +150,7 @@ class Chef
         # since this is a PAUSE signal.
 
         if @service_action_mutex.locked?
-          Chef::Log.info("Currently a chef-client run is happening.")
+          Chef::Log.info("Currently a #{Chef::Dist::PRODUCT} run is happening.")
           Chef::Log.info("Service will pause once it's completed.")
         else
           Chef::Log.info("Service is pausing....")
@@ -184,7 +185,7 @@ class Chef
         # The log_location and config_file of the parent process is passed to the new chef-client process.
         # We need to add the --no-fork, as by default it is set to fork=true.
 
-        Chef::Log.info "Starting chef-client in a new process"
+        Chef::Log.info "Starting #{Chef::Dist::CLIENT} in a new process"
         # Pass config params to the new process
         config_params = " --no-fork"
         config_params += " -c #{Chef::Config[:config_file]}" unless Chef::Config[:config_file].nil?
@@ -196,20 +197,20 @@ class Chef
         # Starts a new process and waits till the process exits
 
         result = shell_out(
-          "chef-client.bat #{config_params}",
-          :timeout => Chef::Config[:windows_service][:watchdog_timeout],
-          :logger => Chef::Log
+          "#{Chef::Dist::CLIENT}.bat #{config_params}",
+          timeout: Chef::Config[:windows_service][:watchdog_timeout],
+          logger: Chef::Log
         )
-        Chef::Log.debug "#{result.stdout}"
-        Chef::Log.debug "#{result.stderr}"
+        Chef::Log.trace (result.stdout).to_s
+        Chef::Log.trace (result.stderr).to_s
       rescue Mixlib::ShellOut::CommandTimeout => e
-        Chef::Log.error "chef-client timed out\n(#{e})"
+        Chef::Log.error "#{Chef::Dist::CLIENT} timed out\n(#{e})"
         Chef::Log.error(<<-EOF)
-            Your chef-client run timed out. You can increase the time chef-client is given
+            Your #{Chef::Dist::CLIENT} run timed out. You can increase the time #{Chef::Dist::CLIENT} is given
             to complete by configuring windows_service.watchdog_timeout in your client.rb.
-          EOF
+        EOF
       rescue Mixlib::ShellOut::ShellCommandFailed => e
-        Chef::Log.warn "Not able to start chef-client in new process (#{e})"
+        Chef::Log.warn "Not able to start #{Chef::Dist::CLIENT} in new process (#{e})"
       rescue => e
         Chef::Log.error e
       ensure
@@ -228,7 +229,7 @@ class Chef
         configure_chef startup_parameters
         configure_logging
 
-        Chef::Config[:chef_server_url] = config[:chef_server_url] if config.has_key? :chef_server_url
+        Chef::Config[:chef_server_url] = config[:chef_server_url] if config.key? :chef_server_url
         unless Chef::Config[:exception_handlers].any? { |h| Chef::Handler::ErrorReport === h }
           Chef::Config[:exception_handlers] << Chef::Handler::ErrorReport.new
         end
@@ -306,14 +307,14 @@ class Chef
 
         begin
           case config[:config_file]
-          when /^(http|https):\/\//
+          when %r{^(http|https)://}
             Chef::HTTP.new("").streaming_request(config[:config_file]) { |f| apply_config(f.path) }
           else
             ::File.open(config[:config_file]) { |f| apply_config(f.path) }
           end
         rescue Errno::ENOENT
           Chef::Log.warn("*****************************************")
-          Chef::Log.warn("Did not find config file: #{config[:config_file]}, using command line options.")
+          Chef::Log.warn("Did not find config file: #{config[:config_file]}. Using command line options instead.")
           Chef::Log.warn("*****************************************")
 
           Chef::Config.merge!(config)

@@ -16,10 +16,10 @@
 # limitations under the License.
 #
 
-require "chef/exceptions"
-require "chef/delayed_evaluator"
-require "chef/chef_class"
-require "chef/log"
+require_relative "exceptions"
+require_relative "delayed_evaluator"
+require_relative "chef_class"
+require_relative "log"
 
 class Chef
   #
@@ -51,6 +51,27 @@ class Chef
       new(**options)
     end
 
+    # This is to support #deprecated_property_alias, by emitting an alias and a
+    # deprecatation warning when called.
+    #
+    # @param from [String] Name of the deprecated property
+    # @param to [String] Name of the correct property
+    # @param message [String] Deprecation message to show to the cookbook author
+    # @param declared_in [Class] Class this property comes from
+    #
+    def self.emit_deprecated_alias(from, to, message, declared_in)
+      declared_in.class_eval <<-EOM, __FILE__, __LINE__ + 1
+        def #{from}(value=NOT_PASSED)
+          Chef.deprecated(:property, "#{message}")
+          #{to}(value)
+        end
+        def #{from}=(value)
+          Chef.deprecated(:property, "#{message}")
+          #{to} = value
+        end
+      EOM
+    end
+
     #
     # Create a new property.
     #
@@ -60,10 +81,12 @@ class Chef
     #   options).
     #   @option options [Symbol] :name The name of this property.
     #   @option options [Class] :declared_in The class this property comes from.
+    #   @option options [String] :description A description of the property.
     #   @option options [Symbol] :instance_variable_name The instance variable
     #     tied to this property. Must include a leading `@`. Defaults to `@<name>`.
     #     `nil` means the property is opaque and not tied to a specific instance
     #     variable.
+    #   @option options [String] :introduced The release that introduced this property
     #   @option options [Boolean] :desired_state `true` if this property is part of desired
     #     state. Defaults to `true`.
     #   @option options [Boolean] :identity `true` if this property is part of object
@@ -80,6 +103,10 @@ class Chef
     #     be run in the context of the instance (and able to access other
     #     properties) and cached. If not, the value will be frozen with Object#freeze
     #     to prevent users from modifying it in an instance.
+    #   @option options [String] :default_description The description of the default value
+    #     used in docs. Particularly useful when a default is computed or lazily eval'd.
+    #   @option options [Boolean] :skip_docs This property should not be included in any
+    #     documentation output
     #   @option options [Proc] :coerce A proc which will be called to
     #     transform the user input to canonical form. The value is passed in,
     #     and the transformed value returned as output. Lazy values will *not*
@@ -88,6 +115,8 @@ class Chef
     #   @option options [Boolean] :required `true` if this property
     #     must be present; `false` otherwise. This is checked after the resource
     #     is fully initialized.
+    #   @option options [String] :deprecated If set, this property is deprecated and
+    #     will create a deprecation warning.
     #
     def initialize(**options)
       options = options.inject({}) { |memo, (key, value)| memo[key.to_sym] = value; memo }
@@ -96,18 +125,19 @@ class Chef
       options[:instance_variable_name] = options[:instance_variable_name].to_sym if options[:instance_variable_name]
 
       # Replace name_attribute with name_property
-      if options.has_key?(:name_attribute)
+      if options.key?(:name_attribute)
         # If we have both name_attribute and name_property and they differ, raise an error
-        if options.has_key?(:name_property)
-          raise ArgumentError, "Cannot specify both name_property and name_attribute together on property #{self}."
+        if options.key?(:name_property)
+          raise ArgumentError, "name_attribute and name_property are functionally identical and both cannot be specified on a property at once. Use just one on property #{self}"
         end
+
         # replace name_property with name_attribute in place
         options = Hash[options.map { |k, v| k == :name_attribute ? [ :name_property, v ] : [ k, v ] }]
         @options = options
       end
 
-      if options.has_key?(:default) && options.has_key?(:name_property)
-        raise ArgumentError, "Cannot specify both default and name_property/name_attribute together on property #{self}"
+      if options.key?(:default) && options.key?(:name_property)
+        raise ArgumentError, "A property cannot be both a name_property/name_attribute and have a default value. Use one or the other on property #{self}"
       end
 
       # Recursively freeze the default if it isn't a lazy value.
@@ -158,6 +188,24 @@ class Chef
     end
 
     #
+    # A description of this property.
+    #
+    # @return [String]
+    #
+    def description
+      options[:description]
+    end
+
+    #
+    # When this property was introduced
+    #
+    # @return [String]
+    #
+    def introduced
+      options[:introduced]
+    end
+
+    #
     # The instance variable associated with this property.
     #
     # Defaults to `@<name>`
@@ -165,7 +213,7 @@ class Chef
     # @return [Symbol]
     #
     def instance_variable_name
-      if options.has_key?(:instance_variable_name)
+      if options.key?(:instance_variable_name)
         options[:instance_variable_name]
       elsif name
         :"@#{name}"
@@ -181,9 +229,19 @@ class Chef
     # `nil`
     #
     def default
-      return options[:default] if options.has_key?(:default)
+      return options[:default] if options.key?(:default)
       return Chef::DelayedEvaluator.new { name } if name_property?
+
       nil
+    end
+
+    #
+    # A desciption of the default value of this property.
+    #
+    # @return [String]
+    #
+    def default_description
+      options[:default_description]
     end
 
     #
@@ -203,7 +261,8 @@ class Chef
     # @return [Boolean]
     #
     def desired_state?
-      return true if !options.has_key?(:desired_state)
+      return true unless options.key?(:desired_state)
+
       options[:desired_state]
     end
 
@@ -222,7 +281,7 @@ class Chef
     # @return [Boolean]
     #
     def has_default?
-      options.has_key?(:default) || name_property?
+      options.key?(:default) || name_property?
     end
 
     #
@@ -232,6 +291,17 @@ class Chef
     #
     def required?
       options[:required]
+    end
+
+    #
+    # Whether this property should be skipped for documentation purposes.
+    #
+    # Defaults to false.
+    #
+    # @return [Boolean]
+    #
+    def skip_docs?
+      options.fetch(:skip_docs, false)
     end
 
     #
@@ -252,7 +322,7 @@ class Chef
     #
     def validation_options
       @validation_options ||= options.reject do |k, v|
-        [:declared_in, :name, :instance_variable_name, :desired_state, :identity, :default, :name_property, :coerce, :required, :nillable, :sensitive].include?(k)
+        %i{declared_in name instance_variable_name desired_state identity default name_property coerce required nillable sensitive description introduced deprecated default_description skip_docs}.include?(k)
       end
     end
 
@@ -277,7 +347,7 @@ class Chef
     #   `get`, the non-lazy, coerced, validated value will always be returned.
     #
     def call(resource, value = NOT_PASSED)
-      if value == NOT_PASSED
+      if NOT_PASSED == value # see https://github.com/chef/chef/pull/8781 before changing this
         get(resource)
       else
         set(resource, value)
@@ -316,31 +386,6 @@ class Chef
       else
         # We are getting the default value.
 
-        # If the user does something like this:
-        #
-        # ```
-        # class MyResource < Chef::Resource
-        #   property :content
-        #   action :create do
-        #     file '/x.txt' do
-        #       content content
-        #     end
-        #   end
-        # end
-        # ```
-        #
-        # It won't do what they expect. This checks whether you try to *read*
-        # `content` while we are compiling the resource.
-        if !nil_set &&
-            resource.respond_to?(:resource_initializing) &&
-            resource.resource_initializing &&
-            resource.respond_to?(:enclosing_provider) &&
-            resource.enclosing_provider &&
-            resource.enclosing_provider.new_resource &&
-            resource.enclosing_provider.new_resource.respond_to?(name)
-          Chef::Log.warn("#{Chef::Log.caller_location}: property #{name} is declared in both #{resource} and #{resource.enclosing_provider}. Use new_resource.#{name} instead. At #{Chef::Log.caller_location}")
-        end
-
         if has_default?
           # If we were able to cache the stored_default, grab it.
           if defined?(@stored_default)
@@ -349,7 +394,7 @@ class Chef
             # Otherwise, we have to validate it now.
             value = input_to_stored_value(resource, default, is_default: true)
           end
-          value = stored_value_to_output(resource, value, is_default: true)
+          value = stored_value_to_output(resource, value)
 
           # If the value is mutable (non-frozen), we set it on the instance
           # so that people can mutate it.  (All constant default values are
@@ -361,7 +406,7 @@ class Chef
       end
 
       if value.nil? && required?
-        raise Chef::Exceptions::ValidationFailed, "#{name} is required"
+        raise Chef::Exceptions::ValidationFailed, "#{name} is a required property"
       else
         value
       end
@@ -385,8 +430,12 @@ class Chef
     def set(resource, value)
       value = set_value(resource, input_to_stored_value(resource, value))
 
+      if options.key?(:deprecated)
+        Chef.deprecated(:property, options[:deprecated])
+      end
+
       if value.nil? && required?
-        raise Chef::Exceptions::ValidationFailed, "#{name} is required"
+        raise Chef::Exceptions::ValidationFailed, "#{name} is a required property"
       else
         value
       end
@@ -441,7 +490,7 @@ class Chef
     #   this property.
     #
     def coerce(resource, value)
-      if options.has_key?(:coerce)
+      if options.key?(:coerce)
         # nil is never coerced
         unless value.nil?
           value = exec_in_resource(resource, options[:coerce], value)
@@ -457,7 +506,7 @@ class Chef
     # options.
     #
     # @param resource [Chef::Resource] The resource we're validating against
-    #   (to provide context for the validate).
+    #   (to provide context for the validation).
     # @param value The value to validate.
     #
     # @raise Chef::Exceptions::ValidationFailed If the value is invalid for
@@ -489,9 +538,9 @@ class Chef
       # if you specify one of them in modified_options it overrides anything in
       # the original options.
       options = self.options
-      if modified_options.has_key?(:name_property) ||
-          modified_options.has_key?(:name_attribute) ||
-          modified_options.has_key?(:default)
+      if modified_options.key?(:name_property) ||
+          modified_options.key?(:name_attribute) ||
+          modified_options.key?(:default)
         options = options.reject { |k, v| k == :name_attribute || k == :name_property || k == :default }
       end
       self.class.new(options.merge(modified_options))
@@ -505,7 +554,7 @@ class Chef
     def emit_dsl
       # We don't create the getter/setter if it's a custom property; we will
       # be using the existing getter/setter to manipulate it instead.
-      return if !instance_variable_name
+      return unless instance_variable_name
 
       # Properties may override existing properties up the inheritance heirarchy, but
       # properties must not override inherited methods like Object#hash.  When the Resource is
@@ -514,18 +563,18 @@ class Chef
       # very confusing results.
       if property_redefines_method?
         resource_name = declared_in.respond_to?(:resource_name) ? declared_in.resource_name : declared_in
-        raise ArgumentError, "Property `#{name}` of resource `#{resource_name}` overwrites an existing method."
+        raise ArgumentError, "Property `#{name}` of resource `#{resource_name}` overwrites an existing method. A different name should be used for this property."
       end
 
       # We prefer this form because the property name won't show up in the
       # stack trace if you use `define_method`.
       declared_in.class_eval <<-EOM, __FILE__, __LINE__ + 1
         def #{name}(value=NOT_PASSED)
-          raise "Property `#{name}` of `\#{self}` was incorrectly passed a block.  Possible property-resource collision.  To call a resource named `#{name}` either rename the property or else use `declare_resource(:#{name}, ...)`" if block_given?
+          raise "Property `#{name}` of `\#{self}` was incorrectly passed a block. Possible property-resource collision. To call a resource named `#{name}` either rename the property or else use `declare_resource(:#{name}, ...)`" if block_given?
           self.class.properties[#{name.inspect}].call(self, value)
         end
         def #{name}=(value)
-          raise "Property `#{name}` of `\#{self}` was incorrectly passed a block.  Possible property-resource collision.  To call a resource named `#{name}` either rename the property or else use `declare_resource(:#{name}, ...)`" if block_given?
+          raise "Property `#{name}` of `\#{self}` was incorrectly passed a block. Possible property-resource collision. To call a resource named `#{name}` either rename the property or else use `declare_resource(:#{name}, ...)`" if block_given?
           self.class.properties[#{name.inspect}].set(self, value)
         end
       EOM
@@ -577,8 +626,10 @@ class Chef
     #
     # @api private
     def explicitly_accepts_nil?(resource)
-      options.has_key?(:coerce) ||
-        (options.has_key?(:is) && resource.send(:_pv_is, { name => nil }, name, options[:is], raise_error: false))
+      options.key?(:coerce) ||
+        (options.key?(:is) && Chef::Mixin::ParamsValidate.send(:_pv_is, { name => nil }, name, options[:is]))
+    rescue Chef::Exceptions::ValidationFailed, Chef::Exceptions::CannotValidateStaticallyError
+      false
     end
 
     # @api private
@@ -654,25 +705,26 @@ class Chef
     end
 
     def input_to_stored_value(resource, value, is_default: false)
+      if value.nil? && !is_default && !explicitly_accepts_nil?(resource)
+        value = default
+      end
       unless value.is_a?(DelayedEvaluator)
-        value = coerce_and_validate(resource, value, is_default: is_default)
+        value = coerce_and_validate(resource, value)
       end
       value
     end
 
-    def stored_value_to_output(resource, value, is_default: false)
+    def stored_value_to_output(resource, value)
       # Crack open lazy values before giving the result to the user
       if value.is_a?(DelayedEvaluator)
         value = exec_in_resource(resource, value)
-        value = coerce_and_validate(resource, value, is_default: is_default)
+        value = coerce_and_validate(resource, value)
       end
       value
     end
 
-    # Coerces and validates the value. If the value is a default, it will warn
-    # the user that invalid defaults are bad mmkay, and return it as if it were
-    # valid.
-    def coerce_and_validate(resource, value, is_default: false)
+    # Coerces and validates the value.
+    def coerce_and_validate(resource, value)
       result = coerce(resource, value)
       validate(resource, result)
 

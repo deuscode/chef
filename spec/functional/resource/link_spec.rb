@@ -19,7 +19,7 @@
 require "spec_helper"
 
 if windows?
-  require "chef/win32/file" #probably need this in spec_helper
+  require "chef/win32/file" # probably need this in spec_helper
   require "chef/win32/security"
 end
 
@@ -27,6 +27,7 @@ describe Chef::Resource::Link do
   let(:file_base) { "file_spec" }
 
   let(:expect_updated?) { true }
+  let(:logger) { double("Mixlib::Log::Child").as_null_object }
 
   # We create the files in a different directory than tmp to exercise
   # different file deployment strategies more completely.
@@ -132,9 +133,9 @@ describe Chef::Resource::Link do
   end
 
   def get_sid(value)
-    if value.kind_of?(String)
+    if value.is_a?(String)
       Chef::ReservedNames::Win32::Security::SID.from_account(value)
-    elsif value.kind_of?(Chef::ReservedNames::Win32::Security::SID)
+    elsif value.is_a?(Chef::ReservedNames::Win32::Security::SID)
       value
     else
       raise "Must specify username or SID: #{value}"
@@ -163,6 +164,7 @@ describe Chef::Resource::Link do
     cookbook_repo = File.expand_path(File.join(CHEF_SPEC_DATA, "cookbooks"))
     cookbook_collection = Chef::CookbookCollection.new(Chef::CookbookLoader.new(cookbook_repo))
     run_context = Chef::RunContext.new(node, cookbook_collection, events)
+    allow(run_context).to receive(:logger).and_return(logger)
     resource = Chef::Resource::Link.new(target_file, run_context)
     resource.to(to)
     resource
@@ -172,7 +174,7 @@ describe Chef::Resource::Link do
     create_resource
   end
 
-  describe "when supported on platform", :not_supported_on_win2k3 do
+  describe "when supported on platform" do
     shared_examples_for "delete errors out" do
       it "delete errors out" do
         expect { resource.run_action(:delete) }.to raise_error(Chef::Exceptions::Link)
@@ -184,7 +186,7 @@ describe Chef::Resource::Link do
       describe "the :delete action" do
         before(:each) do
           @info = []
-          allow(Chef::Log).to receive(:info) { |msg| @info << msg }
+          allow(logger).to receive(:info) { |msg| @info << msg }
           resource.run_action(:delete)
         end
 
@@ -205,7 +207,7 @@ describe Chef::Resource::Link do
       describe "the :delete action" do
         before(:each) do
           @info = []
-          allow(Chef::Log).to receive(:info) { |msg| @info << msg }
+          allow(logger).to receive(:info) { |msg| @info << msg }
           resource.run_action(:delete)
         end
 
@@ -226,7 +228,7 @@ describe Chef::Resource::Link do
       describe "the :create action" do
         before(:each) do
           @info = []
-          allow(Chef::Log).to receive(:info) { |msg| @info << msg }
+          allow(logger).to receive(:info) { |msg| @info << msg }
           resource.run_action(:create)
         end
 
@@ -248,7 +250,7 @@ describe Chef::Resource::Link do
       describe "the :create action" do
         before(:each) do
           @info = []
-          allow(Chef::Log).to receive(:info) { |msg| @info << msg }
+          allow(logger).to receive(:info) { |msg| @info << msg }
           resource.run_action(:create)
         end
 
@@ -270,7 +272,7 @@ describe Chef::Resource::Link do
       describe "the :create action" do
         before(:each) do
           @info = []
-          allow(Chef::Log).to receive(:info) { |msg| @info << msg }
+          allow(logger).to receive(:info) { |msg| @info << msg }
           resource.run_action(:create)
         end
         it "preserves the hard link" do
@@ -295,7 +297,7 @@ describe Chef::Resource::Link do
       describe "the :create action" do
         before(:each) do
           @info = []
-          allow(Chef::Log).to receive(:info) { |msg| @info << msg }
+          allow(logger).to receive(:info) { |msg| @info << msg }
           resource.run_action(:create)
         end
         it "links to the target file" do
@@ -415,11 +417,11 @@ describe Chef::Resource::Link do
 
         it_behaves_like "a securable resource without existing target" do
           let(:path) { target_file }
-          def allowed_acl(sid, expected_perms)
+          def allowed_acl(sid, expected_perms, _flags = 0)
             [ ACE.access_allowed(sid, expected_perms[:specific]) ]
           end
 
-          def denied_acl(sid, expected_perms)
+          def denied_acl(sid, expected_perms, _flags = 0)
             [ ACE.access_denied(sid, expected_perms[:specific]) ]
           end
 
@@ -692,12 +694,6 @@ describe Chef::Resource::Link do
           include_context "delete is noop"
         end
       end
-    end
-  end
-
-  describe "when not supported on platform", :win2k3_only do
-    it "raises error" do
-      expect { resource }.to raise_error(Chef::Exceptions::Win32APIFunctionNotImplemented)
     end
   end
 end

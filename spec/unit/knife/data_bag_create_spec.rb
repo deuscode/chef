@@ -46,8 +46,8 @@ describe Chef::Knife::DataBagCreate do
     allow(knife).to receive(:config).and_return(config)
   end
 
-  context "when data_bag already exist" do
-    it "doesn't creates a data bag" do
+  context "when data_bag already exists" do
+    it "doesn't create a data bag" do
       expect(knife).to receive(:create_object).and_yield(raw_hash)
       expect(rest).to receive(:get).with("data/#{bag_name}")
       expect(rest).to_not receive(:post).with("data", { "name" => bag_name })
@@ -60,16 +60,45 @@ describe Chef::Knife::DataBagCreate do
   context "when data_bag doesn't exist" do
     before do
       # Data bag doesn't exist by default so we mock the GET request to return 404
-      exception = double("404 error", :code => "404")
+      exception = double("404 error", code: "404")
       allow(rest).to receive(:get)
         .with("data/#{bag_name}")
-        .and_raise(Net::HTTPServerException.new("404", exception))
+        .and_raise(Net::HTTPClientException.new("404", exception))
     end
 
     it "tries to create a data bag with an invalid name when given one argument" do
       knife.name_args = ["invalid&char"]
       expect(Chef::DataBag).to receive(:validate_name!).with(knife.name_args[0]).and_raise(Chef::Exceptions::InvalidDataBagName)
       expect { knife.run }.to exit_with_code(1)
+    end
+
+    it "won't create a data bag with a reserved name for search" do
+      %w{node role client environment}.each do |name|
+        knife.name_args = [name]
+        expect(Chef::DataBag).to receive(:validate_name!).with(knife.name_args[0]).and_raise(Chef::Exceptions::InvalidDataBagName)
+        expect { knife.run }.to exit_with_code(1)
+      end
+    end
+
+    context "when part of the name is a reserved name" do
+      before do
+        exception = double("404 error", code: "404")
+        %w{node role client environment}.each do |name|
+          allow(rest).to receive(:get)
+            .with("data/sudoing_#{name}_admins")
+            .and_raise(Net::HTTPClientException.new("404", exception))
+        end
+      end
+
+      it "will create a data bag containing a reserved word" do
+        %w{node role client environment}.each do |name|
+          knife.name_args = ["sudoing_#{name}_admins"]
+          expect(rest).to receive(:post).with("data", { "name" => knife.name_args[0] })
+          expect(knife.ui).to receive(:info).with("Created data_bag[#{knife.name_args[0]}]")
+
+          knife.run
+        end
+      end
     end
 
     context "when given one argument" do
@@ -82,6 +111,23 @@ describe Chef::Knife::DataBagCreate do
         expect(knife.ui).to receive(:info).with("Created data_bag[#{bag_name}]")
 
         knife.run
+      end
+    end
+
+    context "when given a data bag name partially matching a reserved name for search" do
+      %w{xnode rolex xenvironmentx xclientx}.each do |name|
+        let(:bag_name) { name }
+
+        before do
+          knife.name_args = [bag_name]
+        end
+
+        it "creates a data bag named '#{name}'" do
+          expect(rest).to receive(:post).with("data", { "name" => bag_name })
+          expect(knife.ui).to receive(:info).with("Created data_bag[#{bag_name}]")
+
+          knife.run
+        end
       end
     end
 

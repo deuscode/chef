@@ -15,10 +15,10 @@
 # limitations under the License.
 #
 
-require "chef/mixin/which"
-require "chef/mixin/shell_out"
-require "chef/provider/package/dnf/version"
-require "timeout"
+require_relative "../../../mixin/which"
+require_relative "../../../mixin/shell_out"
+require_relative "version"
+require "timeout" unless defined?(Timeout)
 
 class Chef
   class Provider
@@ -37,7 +37,8 @@ class Chef
           DNF_HELPER = ::File.expand_path(::File.join(::File.dirname(__FILE__), "dnf_helper.py")).freeze
 
           def dnf_command
-            @dnf_command ||= which("python", "python3", "python2", "python2.7") do |f|
+            # platform-python is used for system tools on RHEL 8 and is installed under /usr/libexec
+            @dnf_command ||= which("platform-python", "python", "python3", "python2", "python2.7", extra_path: "/usr/libexec") do |f|
               shell_out("#{f} -c 'import dnf'").exitstatus == 0
             end + " #{DNF_HELPER}"
           end
@@ -61,16 +62,25 @@ class Chef
             start if stdin.nil?
           end
 
-          # @returns Array<Version>
+          def compare_versions(version1, version2)
+            with_helper do
+              json = build_version_query("versioncompare", [version1, version2])
+              Chef::Log.trace "sending '#{json}' to python helper"
+              stdin.syswrite json + "\n"
+              stdout.sysread(4096).chomp.to_i
+            end
+          end
+
+          # @return Array<Version>
           def query(action, provides, version = nil, arch = nil)
             with_helper do
               json = build_query(action, provides, version, arch)
-              Chef::Log.debug "sending '#{json}' to python helper"
+              Chef::Log.trace "sending '#{json}' to python helper"
               stdin.syswrite json + "\n"
               output = stdout.sysread(4096).chomp
-              Chef::Log.debug "got '#{output}' from python helper"
+              Chef::Log.trace "got '#{output}' from python helper"
               version = parse_response(output)
-              Chef::Log.debug "parsed #{version} from python helper"
+              Chef::Log.trace "parsed #{version} from python helper"
               version
             end
           end
@@ -109,6 +119,12 @@ class Chef
             FFI_Yajl::Encoder.encode(hash)
           end
 
+          def build_version_query(action, versions)
+            hash = { "action" => action }
+            hash["versions"] = versions
+            FFI_Yajl::Encoder.encode(hash)
+          end
+
           def parse_response(output)
             array = output.split.map { |x| x == "nil" ? nil : x }
             array.each_slice(3).map { |x| Version.new(*x) }.first
@@ -116,9 +132,7 @@ class Chef
 
           def drain_stderr
             output = ""
-            until IO.select([stderr], nil, nil, 0).nil?
-              output += stderr.sysread(4096).chomp
-            end
+            output += stderr.sysread(4096).chomp until IO.select([stderr], nil, nil, 0).nil?
             output
           rescue
             # we must rescue EOFError, and we don't much care about errors on stderr anyway
@@ -134,19 +148,20 @@ class Chef
             end
             output = drain_stderr
             unless output.empty?
-              Chef::Log.debug "discarding output on stderr from python helper: #{output}"
+              Chef::Log.trace "discarding output on stderr from python helper: #{output}"
             end
             ret
           rescue EOFError, Errno::EPIPE, Timeout::Error, Errno::ESRCH => e
             output = drain_stderr
             if ( max_retries -= 1 ) > 0
               unless output.empty?
-                Chef::Log.debug "discarding output on stderr from python helper: #{output}"
+                Chef::Log.trace "discarding output on stderr from python helper: #{output}"
               end
               restart
               retry
             else
               raise e if output.empty?
+
               raise "dnf-helper.py had stderr output:\n\n#{output}"
             end
           end

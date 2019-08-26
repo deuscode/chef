@@ -16,8 +16,8 @@
 # limitations under the License.
 #
 
-require "chef/win32/error"
-require "chef/win32/api/memory"
+require_relative "error"
+require_relative "api/memory"
 
 class Chef
   module ReservedNames::Win32
@@ -67,7 +67,7 @@ class Chef
       # Free memory allocated using local_alloc
       def self.local_free(pointer)
         result = LocalFree(pointer)
-        if !result.null?
+        unless result.null?
           Chef::ReservedNames::Win32::Error.raise!
         end
       end

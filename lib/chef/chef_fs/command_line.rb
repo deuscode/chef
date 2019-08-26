@@ -1,6 +1,6 @@
 #
 # Author:: John Keiser (<jkeiser@chef.io>)
-# Copyright:: Copyright 2012-2016, Chef Software Inc.
+# Copyright:: Copyright 2012-2019, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,9 +16,9 @@
 # limitations under the License.
 #
 
-require "chef/chef_fs/file_system"
-require "chef/chef_fs/file_system/exceptions"
-require "chef/util/diff"
+require_relative "file_system"
+require_relative "file_system/exceptions"
+require_relative "../util/diff"
 
 class Chef
   module ChefFS
@@ -44,6 +44,7 @@ class Chef
 
           when :directory_to_file
             next if diff_filter && diff_filter !~ /T/
+
             if output_mode == :name_only
               yield "#{new_path}\n"
             elsif output_mode == :name_status
@@ -54,6 +55,7 @@ class Chef
 
           when :file_to_directory
             next if diff_filter && diff_filter !~ /T/
+
             if output_mode == :name_only
               yield "#{new_path}\n"
             elsif output_mode == :name_status
@@ -71,6 +73,7 @@ class Chef
               new_path += File.extname(old_path)
             end
             next if diff_filter && diff_filter !~ /D/
+
             if output_mode == :name_only
               yield "#{new_path}\n"
             elsif output_mode == :name_status
@@ -86,6 +89,7 @@ class Chef
 
           when :added
             next if diff_filter && diff_filter !~ /A/
+
             if output_mode == :name_only
               yield "#{new_path}\n"
             elsif output_mode == :name_status
@@ -101,6 +105,7 @@ class Chef
 
           when :modified
             next if diff_filter && diff_filter !~ /M/
+
             if output_mode == :name_only
               yield "#{new_path}\n"
             elsif output_mode == :name_status
@@ -127,7 +132,7 @@ class Chef
             end
           end
         end
-        if !found_match
+        unless found_match
           ui.error "#{pattern}: No such file or directory on remote or local" if ui
           error = true
         end
@@ -146,38 +151,38 @@ class Chef
         if old_entry.dir?
           if new_entry.dir?
             if recurse_depth == 0
-              return [ [ :common_subdirectories, old_entry, new_entry ] ]
+              [ [ :common_subdirectories, old_entry, new_entry ] ]
             else
-              return Chef::ChefFS::Parallelizer.parallelize(Chef::ChefFS::FileSystem.child_pairs(old_entry, new_entry)) do |old_child, new_child|
+              Chef::ChefFS::Parallelizer.parallelize(Chef::ChefFS::FileSystem.child_pairs(old_entry, new_entry)) do |old_child, new_child|
                 Chef::ChefFS::CommandLine.diff_entries(old_child, new_child, recurse_depth ? recurse_depth - 1 : nil, get_content)
               end.flatten(1)
             end
 
           # If old is a directory and new is a file
           elsif new_entry.exists?
-            return [ [ :directory_to_file, old_entry, new_entry ] ]
+            [ [ :directory_to_file, old_entry, new_entry ] ]
 
           # If old is a directory and new does not exist
           elsif new_entry.parent.can_have_child?(old_entry.name, old_entry.dir?)
-            return [ [ :deleted, old_entry, new_entry ] ]
+            [ [ :deleted, old_entry, new_entry ] ]
 
           # If the new entry does not and *cannot* exist, report that.
           else
-            return [ [ :new_cannot_upload, old_entry, new_entry ] ]
+            [ [ :new_cannot_upload, old_entry, new_entry ] ]
           end
 
         # If new is a directory and old is a file
         elsif new_entry.dir?
           if old_entry.exists?
-            return [ [ :file_to_directory, old_entry, new_entry ] ]
+            [ [ :file_to_directory, old_entry, new_entry ] ]
 
           # If new is a directory and old does not exist
           elsif old_entry.parent.can_have_child?(new_entry.name, new_entry.dir?)
-            return [ [ :added, old_entry, new_entry ] ]
+            [ [ :added, old_entry, new_entry ] ]
 
           # If the new entry does not and *cannot* exist, report that.
           else
-            return [ [ :old_cannot_upload, old_entry, new_entry ] ]
+            [ [ :old_cannot_upload, old_entry, new_entry ] ]
           end
 
         # Neither is a directory, so they are diffable with file diff
@@ -239,7 +244,7 @@ class Chef
           end
         end
       rescue Chef::ChefFS::FileSystem::FileSystemError => e
-        return [ [ :error, old_entry, new_entry, nil, nil, e ] ]
+        [ [ :error, old_entry, new_entry, nil, nil, e ] ]
       end
 
       class << self
@@ -271,19 +276,18 @@ class Chef
           new_tempfile.write(new_value)
           new_tempfile.close
 
-          begin
-            old_tempfile = Tempfile.new("old")
-            old_tempfile.write(old_value)
-            old_tempfile.close
+          old_tempfile = Tempfile.new("old")
+          old_tempfile.write(old_value)
+          old_tempfile.close
 
-            result = Chef::Util::Diff.new.udiff(old_tempfile.path, new_tempfile.path)
-            result = result.gsub(/^--- #{old_tempfile.path}/, "--- #{old_path}")
-            result = result.gsub(/^\+\+\+ #{new_tempfile.path}/, "+++ #{new_path}")
-            result
-          ensure
-            old_tempfile.close!
-          end
+          result = Chef::Util::Diff.new.udiff(old_tempfile.path, new_tempfile.path)
+          result = result.gsub(/^--- #{old_tempfile.path}/, "--- #{old_path}")
+          result = result.gsub(/^\+\+\+ #{new_tempfile.path}/, "+++ #{new_path}")
+          result
+        rescue => e
+          "!!! Unable to diff #{old_path} and #{new_path} due to #{e}"
         ensure
+          old_tempfile.close!
           new_tempfile.close!
         end
       end

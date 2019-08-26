@@ -16,13 +16,13 @@
 # limitations under the License.
 #
 
-require "chef/mixin/shell_out"
+require_relative "../../mixin/shell_out"
 
 class Chef
   class Knife
     class CookbookSCMRepo
 
-      DIRTY_REPO = /^[\s]+M/
+      DIRTY_REPO = /^[\s]+M/.freeze
 
       include Chef::Mixin::ShellOut
 
@@ -50,7 +50,7 @@ class Chef
           exit 1
         end
         if use_current_branch
-          @default_branch = get_current_branch()
+          @default_branch = get_current_branch
         end
         unless branch_exists?(default_branch)
           ui.error "The default branch '#{default_branch}' does not exist"
@@ -151,7 +151,7 @@ class Chef
       end
 
       def git(command)
-        shell_out!("git #{command}", :cwd => repo_path)
+        shell_out!("git #{command}", cwd: repo_path)
       end
 
     end

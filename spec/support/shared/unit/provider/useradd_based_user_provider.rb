@@ -1,7 +1,7 @@
 #
 # Author:: Adam Jacob (<adam@chef.io>)
 # Author:: Daniel DeLeo (<dan@chef.io>)
-# Copyright:: Copyright 2008-2016, Chef Software Inc.
+# Copyright:: Copyright 2008-2018, Chef Software Inc.
 #
 # License:: Apache License, Version 2.0
 #
@@ -68,8 +68,8 @@ shared_examples_for "a useradd-based user provider" do |supported_useradd_option
       end
 
       it "should set the option for #{attribute} if the new resources #{attribute} is not nil, without homedir management" do
-        allow(@new_resource).to receive(:supports).and_return({ :manage_home => false,
-                                                                :non_unique => false })
+        allow(@new_resource).to receive(:supports).and_return({ manage_home: false,
+                                                                non_unique: false })
         allow(@new_resource).to receive(attribute).and_return("hola")
         expect(provider.universal_options).to eql([option, "hola"])
       end
@@ -85,7 +85,7 @@ shared_examples_for "a useradd-based user provider" do |supported_useradd_option
 
     it "should combine all the possible options" do
       combined_opts = []
-      supported_useradd_options.sort { |a, b| a[0] <=> b[0] }.each do |attribute, option|
+      supported_useradd_options.sort_by { |a| a[0] }.each do |attribute, option|
         allow(@new_resource).to receive(attribute).and_return("hola")
         combined_opts << option << "hola"
       end
@@ -160,7 +160,7 @@ shared_examples_for "a useradd-based user provider" do |supported_useradd_option
                        "-d", "/Users/mud",
                        "-m",
                        "adam" ])
-      expect(provider).to receive(:shell_out!).with(*command).and_return(true)
+      expect(provider).to receive(:shell_out_compacted!).with(*command).and_return(true)
       provider.create_user
     end
 
@@ -181,7 +181,7 @@ shared_examples_for "a useradd-based user provider" do |supported_useradd_option
                          "-u", "1000",
                          "-r", "-m",
                          "adam" ])
-        expect(provider).to receive(:shell_out!).with(*command).and_return(true)
+        expect(provider).to receive(:shell_out_compacted!).with(*command).and_return(true)
         provider.create_user
       end
 
@@ -204,7 +204,7 @@ shared_examples_for "a useradd-based user provider" do |supported_useradd_option
                   "-d", "/Users/mud",
                   "-m",
                   "adam" ]
-      expect(provider).to receive(:shell_out!).with(*command).and_return(true)
+      expect(provider).to receive(:shell_out_compacted!).with(*command).and_return(true)
       provider.manage_user
     end
 
@@ -215,7 +215,7 @@ shared_examples_for "a useradd-based user provider" do |supported_useradd_option
                   "-d", "/Users/mud",
                   "-m",
                   "adam" ]
-      expect(provider).to receive(:shell_out!).with(*command).and_return(true)
+      expect(provider).to receive(:shell_out_compacted!).with(*command).and_return(true)
       provider.manage_user
     end
 
@@ -224,7 +224,7 @@ shared_examples_for "a useradd-based user provider" do |supported_useradd_option
       command = ["usermod",
                   "-g", "23",
                   "adam" ]
-      expect(provider).to receive(:shell_out!).with(*command).and_return(true)
+      expect(provider).to receive(:shell_out_compacted!).with(*command).and_return(true)
       provider.manage_user
     end
   end
@@ -232,24 +232,24 @@ shared_examples_for "a useradd-based user provider" do |supported_useradd_option
   describe "when removing a user" do
 
     it "should run userdel with the new resources user name" do
-      expect(provider).to receive(:shell_out!).with("userdel", @new_resource.username).and_return(true)
+      expect(provider).to receive(:shell_out_compacted!).with("userdel", @new_resource.username).and_return(true)
       provider.remove_user
     end
 
     it "should run userdel with the new resources user name and -r if manage_home is true" do
       @new_resource.manage_home true
-      expect(provider).to receive(:shell_out!).with("userdel", "-r", @new_resource.username).and_return(true)
+      expect(provider).to receive(:shell_out_compacted!).with("userdel", "-r", @new_resource.username).and_return(true)
       provider.remove_user
     end
 
     it "should run userdel with the new resources user name if non_unique is true" do
-      expect(provider).to receive(:shell_out!).with("userdel", @new_resource.username).and_return(true)
+      expect(provider).to receive(:shell_out_compacted!).with("userdel", @new_resource.username).and_return(true)
       provider.remove_user
     end
 
     it "should run userdel with the new resources user name and -f if force is true" do
       @new_resource.force(true)
-      expect(provider).to receive(:shell_out!).with("userdel", "-f", @new_resource.username).and_return(true)
+      expect(provider).to receive(:shell_out_compacted!).with("userdel", "-f", @new_resource.username).and_return(true)
       provider.remove_user
     end
   end
@@ -257,7 +257,7 @@ shared_examples_for "a useradd-based user provider" do |supported_useradd_option
   describe "when checking the lock" do
     # lazy initialize so we can modify stdout and stderr strings
     let(:passwd_s_status) do
-      double("Mixlib::ShellOut command", :exitstatus => 0, :stdout => @stdout, :stderr => @stderr, :error! => nil)
+      double("Mixlib::ShellOut command", exitstatus: 0, stdout: @stdout, stderr: @stderr, error!: nil)
     end
 
     before(:each) do
@@ -266,57 +266,57 @@ shared_examples_for "a useradd-based user provider" do |supported_useradd_option
       #   :nil_object => true,
       #   :username => "adam"
       # )
-      #provider = Chef::Provider::User::Useradd.new(@node, @new_resource)
+      # provider = Chef::Provider::User::Useradd.new(@node, @new_resource)
       @stdout = "root P 09/02/2008 0 99999 7 -1"
       @stderr = ""
     end
 
     it "should return false if status begins with P" do
-      expect(provider).to receive(:shell_out).
-        with("passwd", "-S", @new_resource.username, { :returns => [0, 1] }).
-        and_return(passwd_s_status)
+      expect(provider).to receive(:shell_out)
+        .with("passwd", "-S", @new_resource.username, { returns: [0, 1] })
+        .and_return(passwd_s_status)
       expect(provider.check_lock).to eql(false)
     end
 
     it "should return false if status begins with N" do
       @stdout = "root N"
-      expect(provider).to receive(:shell_out).
-        with("passwd", "-S", @new_resource.username, { :returns => [0, 1] }).
-        and_return(passwd_s_status)
+      expect(provider).to receive(:shell_out)
+        .with("passwd", "-S", @new_resource.username, { returns: [0, 1] })
+        .and_return(passwd_s_status)
       expect(provider.check_lock).to eql(false)
     end
 
     it "should return true if status begins with L" do
       @stdout = "root L"
-      expect(provider).to receive(:shell_out).
-        with("passwd", "-S", @new_resource.username, { :returns => [0, 1] }).
-        and_return(passwd_s_status)
+      expect(provider).to receive(:shell_out)
+        .with("passwd", "-S", @new_resource.username, { returns: [0, 1] })
+        .and_return(passwd_s_status)
       expect(provider.check_lock).to eql(true)
     end
 
     it "should raise a ShellCommandFailed exception if passwd -S exits with something other than 0 or 1" do
       expect(passwd_s_status).to receive(:error!).and_raise(Mixlib::ShellOut::ShellCommandFailed)
-      expect(provider).to receive(:shell_out).
-        with("passwd", "-S", @new_resource.username, { :returns => [0, 1] }).
-        and_return(passwd_s_status)
+      expect(provider).to receive(:shell_out)
+        .with("passwd", "-S", @new_resource.username, { returns: [0, 1] })
+        .and_return(passwd_s_status)
       expect { provider.check_lock }.to raise_error(Mixlib::ShellOut::ShellCommandFailed)
     end
 
     it "should raise an error if the output isn't parsable" do
       expect(passwd_s_status).to receive(:stdout).and_return("")
       expect(passwd_s_status).to receive(:stderr).and_return("")
-      expect(provider).to receive(:shell_out).
-        with("passwd", "-S", @new_resource.username, { :returns => [0, 1] }).
-        and_return(passwd_s_status)
+      expect(provider).to receive(:shell_out)
+        .with("passwd", "-S", @new_resource.username, { returns: [0, 1] })
+        .and_return(passwd_s_status)
       expect { provider.check_lock }.to raise_error(Chef::Exceptions::User)
     end
 
     context "when in why run mode" do
       before do
-        passwd_status = double("Mixlib::ShellOut command", :exitstatus => 0, :stdout => "", :stderr => "passwd: user 'chef-test' does not exist\n")
-        expect(provider).to receive(:shell_out).
-          with("passwd", "-S", @new_resource.username, { :returns => [0, 1] }).
-          and_return(passwd_status)
+        passwd_status = double("Mixlib::ShellOut command", exitstatus: 0, stdout: "", stderr: "passwd: user 'chef-test' does not exist\n")
+        expect(provider).to receive(:shell_out)
+          .with("passwd", "-S", @new_resource.username, { returns: [0, 1] })
+          .and_return(passwd_status)
         # ubuntu returns 252 on user-does-not-exist so will raise if #error! is called or if
         # shell_out! is used
         allow(passwd_status).to receive(:error!).and_raise(Mixlib::ShellOut::ShellCommandFailed)
@@ -335,14 +335,14 @@ shared_examples_for "a useradd-based user provider" do |supported_useradd_option
 
   describe "when locking the user" do
     it "should run usermod -L with the new resources username" do
-      expect(provider).to receive(:shell_out!).with("usermod", "-L", @new_resource.username)
+      expect(provider).to receive(:shell_out_compacted!).with("usermod", "-L", @new_resource.username)
       provider.lock_user
     end
   end
 
   describe "when unlocking the user" do
     it "should run usermod -L with the new resources username" do
-      expect(provider).to receive(:shell_out!).with("usermod", "-U", @new_resource.username)
+      expect(provider).to receive(:shell_out_compacted!).with("usermod", "-U", @new_resource.username)
       provider.unlock_user
     end
   end
@@ -385,7 +385,7 @@ shared_examples_for "a useradd-based user provider" do |supported_useradd_option
         expect(Pathname).to receive(:new).with(@new_resource.home).and_return(@new_home_mock)
         expect(@new_home_mock).to receive(:cleanpath).and_return(home_check["new_resource_home"].last)
 
-        expect(provider.updating_home?).to eq(home_check["expected_result"])
+        expect(provider.send(:updating_home?)).to eq(home_check["expected_result"])
       end
     end
     it "should return true if the current home does not exist but a home is specified by the new resource" do
@@ -396,7 +396,7 @@ shared_examples_for "a useradd-based user provider" do |supported_useradd_option
       @current_resource.home nil
       @new_resource.home "/home/kitten"
 
-      expect(provider.updating_home?).to eq(true)
+      expect(provider.send(:updating_home?)).to eq(true)
     end
   end
 end

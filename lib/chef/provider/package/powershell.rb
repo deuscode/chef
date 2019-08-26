@@ -15,9 +15,9 @@
 # limitations under the License.
 #
 
-require "chef/provider/package"
-require "chef/resource/powershell_package"
-require "chef/mixin/powershell_out"
+require_relative "../package"
+require_relative "../../resource/powershell_package"
+require_relative "../../mixin/powershell_out"
 
 class Chef
   class Provider
@@ -25,7 +25,7 @@ class Chef
       class Powershell < Chef::Provider::Package
         include Chef::Mixin::PowershellOut
 
-        provides :powershell_package, os: "windows"
+        provides :powershell_package
 
         def load_current_resource
           @current_resource = Chef::Resource::PowershellPackage.new(new_resource.name)
@@ -37,12 +37,13 @@ class Chef
         def define_resource_requirements
           super
           if powershell_out("$PSVersionTable.PSVersion.Major").stdout.strip.to_i < 5
-            raise "Minimum installed Powershell Version required is 5"
+            raise "Minimum installed PowerShell Version required is 5"
           end
+
           requirements.assert(:install) do |a|
             a.assertion { candidates_exist_for_all_uninstalled? }
-            a.failure_message(Chef::Exceptions::Package, "No candidate version available for #{packages_missing_candidates.join(', ')}")
-            a.whyrun("Assuming a repository that offers #{packages_missing_candidates.join(', ')} would have been configured")
+            a.failure_message(Chef::Exceptions::Package, "No candidate version available for #{packages_missing_candidates.join(", ")}")
+            a.whyrun("Assuming a repository that offers #{packages_missing_candidates.join(", ")} would have been configured")
           end
         end
 
@@ -53,7 +54,9 @@ class Chef
         # Installs the package specified with the version passed else latest version will be installed
         def install_package(names, versions)
           names.each_with_index do |name, index|
-            powershell_out("Install-Package '#{name}' -Force -ForceBootstrap -RequiredVersion #{versions[index]}", timeout: new_resource.timeout)
+            cmd = powershell_out(build_powershell_package_command("Install-Package '#{name}'", versions[index]), timeout: new_resource.timeout)
+            next if cmd.nil?
+            raise Chef::Exceptions::PowershellCmdletException, "Failed to install package due to catalog signing error, use skip_publisher_check to force install" if cmd.stderr =~ /SkipPublisherCheck/
           end
         end
 
@@ -61,13 +64,13 @@ class Chef
         def remove_package(names, versions)
           names.each_with_index do |name, index|
             if versions && !versions[index].nil?
-              powershell_out( "Uninstall-Package '#{name}' -Force -ForceBootstrap -RequiredVersion #{versions[index]}", timeout: new_resource.timeout)
+              powershell_out(build_powershell_package_command("Uninstall-Package '#{name}'", versions[index]), timeout: new_resource.timeout)
             else
               version = "0"
               until version.empty?
-                version = powershell_out( "(Uninstall-Package '#{name}' -Force -ForceBootstrap | select version | Format-Table -HideTableHeaders | Out-String).Trim()", timeout: new_resource.timeout).stdout.strip
+                version = powershell_out(build_powershell_package_command("Uninstall-Package '#{name}'"), timeout: new_resource.timeout).stdout.strip
                 unless version.empty?
-                  Chef::Log.info("Removed package '#{name}' with version #{version}")
+                  logger.info("Removed package '#{name}' with version #{version}")
                 end
               end
             end
@@ -79,9 +82,9 @@ class Chef
           versions = []
           new_resource.package_name.each_with_index do |name, index|
             version = if new_resource.version && !new_resource.version[index].nil?
-                        powershell_out("(Find-Package '#{name}' -RequiredVersion #{new_resource.version[index]} -ForceBootstrap -Force | select version | Format-Table -HideTableHeaders | Out-String).Trim()", timeout: new_resource.timeout).stdout.strip
+                        powershell_out(build_powershell_package_command("Find-Package '#{name}'", new_resource.version[index]), timeout: new_resource.timeout).stdout.strip
                       else
-                        powershell_out("(Find-Package '#{name}' -ForceBootstrap -Force | select version | Format-Table -HideTableHeaders | Out-String).Trim()", timeout: new_resource.timeout).stdout.strip
+                        powershell_out(build_powershell_package_command("Find-Package '#{name}'"), timeout: new_resource.timeout).stdout.strip
                       end
             if version.empty?
               version = nil
@@ -96,9 +99,9 @@ class Chef
           version_list = []
           new_resource.package_name.each_with_index do |name, index|
             version = if new_resource.version && !new_resource.version[index].nil?
-                        powershell_out("(Get-Package -Name '#{name}' -RequiredVersion #{new_resource.version[index]} -ForceBootstrap -Force | select version | Format-Table -HideTableHeaders | Out-String).Trim()", timeout: new_resource.timeout).stdout.strip
+                        powershell_out(build_powershell_package_command("Get-Package '#{name}'", new_resource.version[index]), timeout: new_resource.timeout).stdout.strip
                       else
-                        powershell_out("(Get-Package -Name '#{name}' -ForceBootstrap -Force | select version | Format-Table -HideTableHeaders | Out-String).Trim()", timeout: new_resource.timeout).stdout.strip
+                        powershell_out(build_powershell_package_command("Get-Package '#{name}'"), timeout: new_resource.timeout).stdout.strip
                       end
             if version.empty?
               version = nil
@@ -108,6 +111,23 @@ class Chef
           version_list
         end
 
+        def build_powershell_package_command(command, version = nil)
+          command = [command] unless command.is_a?(Array)
+          cmdlet_name = command.first
+          command.unshift("(")
+          %w{-Force -ForceBootstrap}.each do |arg|
+            command.push(arg)
+          end
+          command.push("-RequiredVersion #{version}") if version
+          command.push("-Source #{new_resource.source}") if new_resource.source && cmdlet_name =~ Regexp.union(/Install-Package/, /Find-Package/)
+          command.push("-SkipPublisherCheck") if new_resource.skip_publisher_check && cmdlet_name !~ /Find-Package/
+          command.push(").Version")
+          command.join(" ")
+        end
+
+        def check_resource_semantics!
+          # This validation method from Chef::Provider::Package does not apply here, so no-op it.
+        end
       end
     end
   end

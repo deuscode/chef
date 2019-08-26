@@ -81,7 +81,7 @@ shared_context "use Windows permissions", :windows_only do
     SID ||= Chef::ReservedNames::Win32::Security::SID
     ACE ||= Chef::ReservedNames::Win32::Security::ACE
     ACL ||= Chef::ReservedNames::Win32::Security::ACL
-    SecurableObject ||= Chef::ReservedNames::Win32::Security::SecurableObject # rubocop:disable Style/ConstantName
+    SecurableObject ||= Chef::ReservedNames::Win32::Security::SecurableObject # rubocop:disable Naming/ConstantName
   end
 
   def get_security_descriptor(path)
@@ -89,13 +89,13 @@ shared_context "use Windows permissions", :windows_only do
   end
 
   def explicit_aces
-    descriptor.dacl.select { |ace| ace.explicit? }
+    descriptor.dacl.select(&:explicit?)
   end
 
   def extract_ace_properties(aces)
     hashes = []
     aces.each do |ace|
-      hashes << { :mask => ace.mask, :type => ace.type, :flags => ace.flags }
+      hashes << { mask: ace.mask, type: ace.type, flags: ace.flags }
     end
     hashes
   end
@@ -103,38 +103,39 @@ shared_context "use Windows permissions", :windows_only do
   # Standard expected rights
   let(:expected_read_perms) do
     {
-      :generic => Chef::ReservedNames::Win32::API::Security::GENERIC_READ,
-      :specific => Chef::ReservedNames::Win32::API::Security::FILE_GENERIC_READ,
+      generic: Chef::ReservedNames::Win32::API::Security::GENERIC_READ,
+      specific: Chef::ReservedNames::Win32::API::Security::FILE_GENERIC_READ,
     }
   end
 
   let(:expected_read_execute_perms) do
     {
-      :generic => Chef::ReservedNames::Win32::API::Security::GENERIC_READ | Chef::ReservedNames::Win32::API::Security::GENERIC_EXECUTE,
-      :specific => Chef::ReservedNames::Win32::API::Security::FILE_GENERIC_READ | Chef::ReservedNames::Win32::API::Security::FILE_GENERIC_EXECUTE,
+      generic: Chef::ReservedNames::Win32::API::Security::GENERIC_READ | Chef::ReservedNames::Win32::API::Security::GENERIC_EXECUTE,
+      specific: Chef::ReservedNames::Win32::API::Security::FILE_GENERIC_READ | Chef::ReservedNames::Win32::API::Security::FILE_GENERIC_EXECUTE,
     }
   end
 
   let(:expected_write_perms) do
     {
-      :generic => Chef::ReservedNames::Win32::API::Security::GENERIC_WRITE,
-      :specific => Chef::ReservedNames::Win32::API::Security::FILE_GENERIC_WRITE,
+      specific: Chef::ReservedNames::Win32::API::Security::WRITE,
     }
   end
 
   let(:expected_modify_perms) do
     {
-      :generic => Chef::ReservedNames::Win32::API::Security::GENERIC_READ | Chef::ReservedNames::Win32::API::Security::GENERIC_WRITE | Chef::ReservedNames::Win32::API::Security::GENERIC_EXECUTE | Chef::ReservedNames::Win32::API::Security::DELETE,
-      :specific => Chef::ReservedNames::Win32::API::Security::FILE_GENERIC_READ | Chef::ReservedNames::Win32::API::Security::FILE_GENERIC_WRITE | Chef::ReservedNames::Win32::API::Security::FILE_GENERIC_EXECUTE | Chef::ReservedNames::Win32::API::Security::DELETE,
+      generic: Chef::ReservedNames::Win32::API::Security::GENERIC_READ | Chef::ReservedNames::Win32::API::Security::GENERIC_WRITE | Chef::ReservedNames::Win32::API::Security::GENERIC_EXECUTE | Chef::ReservedNames::Win32::API::Security::DELETE,
+      specific: Chef::ReservedNames::Win32::API::Security::FILE_GENERIC_READ | Chef::ReservedNames::Win32::API::Security::FILE_GENERIC_WRITE | Chef::ReservedNames::Win32::API::Security::FILE_GENERIC_EXECUTE | Chef::ReservedNames::Win32::API::Security::DELETE,
     }
   end
 
   let(:expected_full_control_perms) do
     {
-      :generic => Chef::ReservedNames::Win32::API::Security::GENERIC_ALL,
-      :specific => Chef::ReservedNames::Win32::API::Security::FILE_ALL_ACCESS,
+      generic: Chef::ReservedNames::Win32::API::Security::GENERIC_ALL,
+      specific: Chef::ReservedNames::Win32::API::Security::FILE_ALL_ACCESS,
     }
   end
+
+  let (:write_flag) { 3 }
 
   RSpec::Matchers.define :have_expected_properties do |mask, type, flags|
     match do |ace|
@@ -313,7 +314,7 @@ shared_examples_for "a securable resource without existing target" do
     end
 
     it "sets owner when owner is specified with a \\" do
-      resource.owner "#{ENV['USERDOMAIN']}\\Guest"
+      resource.owner "#{ENV["COMPUTERNAME"]}\\Guest"
       resource.run_action(:create)
       expect(descriptor.owner).to eq(SID.Guest)
     end
@@ -363,88 +364,118 @@ shared_examples_for "a securable resource without existing target" do
       expect(descriptor.group).to eq(arbitrary_non_default_group)
     end
 
-    describe "with rights and deny_rights attributes" do
+    describe "#allowed_acl" do
+      context "correctly sets" do
 
-      it "correctly sets :read rights" do
-        resource.rights(:read, "Guest")
-        resource.run_action(:create)
-        expect(explicit_aces).to eq(allowed_acl(SID.Guest, expected_read_perms))
+        it ":read rights" do
+          resource.rights(:read, "Guest")
+          resource.run_action(:create)
+          expect(explicit_aces).to eq(allowed_acl(SID.Guest, expected_read_perms))
+        end
+
+        it ":read_execute rights" do
+          resource.rights(:read_execute, "Guest")
+          resource.run_action(:create)
+          expect(explicit_aces).to eq(allowed_acl(SID.Guest, expected_read_execute_perms))
+        end
+
+        it ":write rights" do
+          resource.rights(:write, "Guest")
+          resource.run_action(:create)
+          expect(explicit_aces).to eq(allowed_acl(SID.Guest, expected_write_perms, write_flag))
+        end
+
+        it ":modify rights" do
+          resource.rights(:modify, "Guest")
+          resource.run_action(:create)
+          expect(explicit_aces).to eq(allowed_acl(SID.Guest, expected_modify_perms))
+        end
+
+        it ":full_control rights" do
+          resource.rights(:full_control, "Guest")
+          resource.run_action(:create)
+          expect(explicit_aces).to eq(allowed_acl(SID.Guest, expected_full_control_perms))
+        end
+
+        it "multiple rights" do
+          resource.rights(:read, "Everyone")
+          resource.rights(:modify, "Guest")
+          resource.run_action(:create)
+
+          expect(explicit_aces).to eq(
+            allowed_acl(SID.Everyone, expected_read_perms) +
+            allowed_acl(SID.Guest, expected_modify_perms)
+          )
+        end
       end
+    end
 
-      it "correctly sets :read_execute rights" do
-        resource.rights(:read_execute, "Guest")
-        resource.run_action(:create)
-        expect(explicit_aces).to eq(allowed_acl(SID.Guest, expected_read_execute_perms))
+    describe "#denied_acl" do
+      context "correctly sets" do
+
+        it ":read rights" do
+          resource.deny_rights(:read, "Guest")
+          resource.run_action(:create)
+          expect(explicit_aces).to eq(denied_acl(SID.Guest, expected_read_perms))
+        end
+
+        it ":read_execute rights" do
+          resource.deny_rights(:read_execute, "Guest")
+          resource.run_action(:create)
+          expect(explicit_aces).to eq(denied_acl(SID.Guest, expected_read_execute_perms))
+        end
+
+        it ":write rights" do
+          resource.deny_rights(:write, "Guest")
+          resource.run_action(:create)
+          expect(explicit_aces).to eq(denied_acl(SID.Guest, expected_write_perms, write_flag))
+        end
+
+        it ":modify rights" do
+          resource.deny_rights(:modify, "Guest")
+          resource.run_action(:create)
+          expect(explicit_aces).to eq(denied_acl(SID.Guest, expected_modify_perms))
+        end
+
+        it ":full_control rights" do
+          # deny is an ACE with full rights, but is a deny type ace, not an allow type
+          resource.deny_rights(:full_control, "Guest")
+          resource.run_action(:create)
+          expect(explicit_aces).to eq(denied_acl(SID.Guest, expected_full_control_perms))
+        end
+
+        it "deny_rights ahead of rights" do
+          resource.rights(:read, "Everyone")
+          resource.deny_rights(:modify, "Guest")
+          resource.run_action(:create)
+
+          expect(explicit_aces).to eq(
+            denied_acl(SID.Guest, expected_modify_perms) +
+            allowed_acl(SID.Everyone, expected_read_perms)
+          )
+        end
+
+        it "deny_rights ahead of rights when specified in reverse order" do
+          resource.deny_rights(:modify, "Guest")
+          resource.rights(:read, "Everyone")
+          resource.run_action(:create)
+
+          expect(explicit_aces).to eq(
+            denied_acl(SID.Guest, expected_modify_perms) +
+            allowed_acl(SID.Everyone, expected_read_perms)
+          )
+        end
       end
-
-      it "correctly sets :write rights" do
-        resource.rights(:write, "Guest")
-        resource.run_action(:create)
-        expect(explicit_aces).to eq(allowed_acl(SID.Guest, expected_write_perms))
-      end
-
-      it "correctly sets :modify rights" do
-        resource.rights(:modify, "Guest")
-        resource.run_action(:create)
-        expect(explicit_aces).to eq(allowed_acl(SID.Guest, expected_modify_perms))
-      end
-
-      it "correctly sets :full_control rights" do
-        resource.rights(:full_control, "Guest")
-        resource.run_action(:create)
-        expect(explicit_aces).to eq(allowed_acl(SID.Guest, expected_full_control_perms))
-      end
-
-      it "correctly sets deny_rights" do
-        # deny is an ACE with full rights, but is a deny type ace, not an allow type
-        resource.deny_rights(:full_control, "Guest")
-        resource.run_action(:create)
-        expect(explicit_aces).to eq(denied_acl(SID.Guest, expected_full_control_perms))
-      end
-
-      it "Sets multiple rights" do
-        resource.rights(:read, "Everyone")
-        resource.rights(:modify, "Guest")
-        resource.run_action(:create)
-
-        expect(explicit_aces).to eq(
-          allowed_acl(SID.Everyone, expected_read_perms) +
-          allowed_acl(SID.Guest, expected_modify_perms)
-        )
-      end
-
-      it "Sets deny_rights ahead of rights" do
-        resource.rights(:read, "Everyone")
-        resource.deny_rights(:modify, "Guest")
-        resource.run_action(:create)
-
-        expect(explicit_aces).to eq(
-          denied_acl(SID.Guest, expected_modify_perms) +
-          allowed_acl(SID.Everyone, expected_read_perms)
-        )
-      end
-
-      it "Sets deny_rights ahead of rights when specified in reverse order" do
-        resource.deny_rights(:modify, "Guest")
-        resource.rights(:read, "Everyone")
-        resource.run_action(:create)
-
-        expect(explicit_aces).to eq(
-          denied_acl(SID.Guest, expected_modify_perms) +
-          allowed_acl(SID.Everyone, expected_read_perms)
-        )
-      end
-
     end
 
     context "with a mode attribute" do
       if windows?
-        Security ||= Chef::ReservedNames::Win32::API::Security # rubocop:disable Style/ConstantName
+        Security ||= Chef::ReservedNames::Win32::API::Security # rubocop:disable Naming/ConstantName
       end
 
       it "respects mode in string form as an octal number" do
-        #on windows, mode cannot modify owner and/or group permissons
-        #unless the owner and/or group as appropriate is specified
+        # on windows, mode cannot modify owner and/or group permissons
+        # unless the owner and/or group as appropriate is specified
         resource.mode "400"
         resource.owner "Guest"
         resource.group "Everyone"
@@ -529,16 +560,12 @@ shared_examples_for "a securable resource without existing target" do
 
       # On certain flavors of Windows the default list of ACLs sometimes includes
       # non-inherited ACLs. Filter them out here.
-      parent_inherited_acls = parent_acls.dacl.collect do |ace|
-        ace.inherited?
-      end
+      parent_inherited_acls = parent_acls.dacl.collect(&:inherited?)
 
       resource.run_action(:create)
 
       # Similarly filter out the non-inherited ACLs
-      resource_inherited_acls = descriptor.dacl.collect do |ace|
-        ace.inherited?
-      end
+      resource_inherited_acls = descriptor.dacl.collect(&:inherited?)
 
       expect(resource_inherited_acls).to eq(parent_inherited_acls)
     end

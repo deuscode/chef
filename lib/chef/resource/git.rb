@@ -16,28 +16,19 @@
 # limitations under the License.
 #
 
-require "chef/resource/scm"
+require_relative "scm"
 
 class Chef
   class Resource
     class Git < Chef::Resource::Scm
+      description "Use the git resource to manage source control resources that exist in a git repository. git version 1.6.5 (or higher) is required to use all of the functionality in the git resource."
 
-      def initialize(name, run_context = nil)
-        super
-        @additional_remotes = Hash[]
-      end
-
-      def additional_remotes(arg = nil)
-        set_or_return(
-          :additional_remotes,
-          arg,
-          :kind_of => Hash
-        )
-      end
+      property :additional_remotes, Hash,
+        description: "A Hash of additional remotes that are added to the git repository configuration.",
+        default: lazy { {} }
 
       alias :branch :revision
       alias :reference :revision
-
       alias :repo :repository
     end
   end

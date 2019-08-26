@@ -15,18 +15,19 @@ Gem::Specification.new do |spec|
 
   spec.require_paths = ["lib"]
 
-  spec.add_dependency "mixlib-shellout", "~> 2.0"
-  spec.add_dependency "mixlib-config", "~> 2.0"
+  spec.add_dependency "mixlib-shellout", ">= 2.0", "< 4.0"
+  spec.add_dependency "mixlib-config", ">= 2.2.12", "< 4.0"
   spec.add_dependency "fuzzyurl"
   spec.add_dependency "addressable"
+  spec.add_dependency "tomlrb", "~> 1.2"
 
-  spec.add_development_dependency "rake", "~> 10.0"
+  spec.add_development_dependency "rake"
 
   %w{rspec-core rspec-expectations rspec-mocks}.each do |rspec|
     spec.add_development_dependency(rspec, "~> 3.2")
   end
 
-  spec.files = %w{Rakefile LICENSE README.md} + Dir.glob("*.gemspec") +
+  spec.files = %w{Rakefile LICENSE} + Dir.glob("*.gemspec") +
     Dir.glob("{lib,spec}/**/*", File::FNM_DOTMATCH).reject { |f| File.directory?(f) }
 
   spec.bindir        = "bin"

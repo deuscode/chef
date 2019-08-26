@@ -34,13 +34,13 @@ describe Chef::Knife::SubcommandLoader::GemGlobLoader do
   it "builds a list of the core subcommand file require paths" do
     expect(loader.subcommand_files).not_to be_empty
     loader.subcommand_files.each do |require_path|
-      expect(require_path).to match(/chef\/knife\/.*|plugins\/knife\/.*/)
+      expect(require_path).to match(%r{chef/knife/.*|plugins/knife/.*})
     end
   end
 
   it "finds files installed via rubygems" do
     expect(loader.find_subcommands_via_rubygems).to include("chef/knife/node_create")
-    loader.find_subcommands_via_rubygems.each { |rel_path, abs_path| expect(abs_path).to match(%r{chef/knife/.+}) }
+    loader.find_subcommands_via_rubygems.each_value { |abs_path| expect(abs_path).to match(%r{chef/knife/.+}) }
   end
 
   it "finds files from latest version of installed gems" do
@@ -52,7 +52,7 @@ describe Chef::Knife::SubcommandLoader::GemGlobLoader do
     expect($LOAD_PATH).to receive(:map).and_return([])
     if Gem::Specification.respond_to? :latest_specs
       expect(Gem::Specification).to receive(:latest_specs).with(true).and_return(gems)
-      expect(gems[0]).to receive(:matches_for_glob).with(/chef\/knife\/\*\.rb\{(.*),\.rb,(.*)\}/).and_return(gem_files)
+      expect(gems[0]).to receive(:matches_for_glob).with(%r{chef/knife/\*\.rb\{(.*),\.rb,(.*)\}}).and_return(gem_files)
     else
       expect(Gem.source_index).to receive(:latest_specs).with(true).and_return(gems)
       expect(gems[0]).to receive(:require_paths).twice.and_return(["lib"])
@@ -65,7 +65,7 @@ describe Chef::Knife::SubcommandLoader::GemGlobLoader do
 
   it "finds files using a dirglob when rubygems is not available" do
     expect(loader.find_subcommands_via_dirglob).to include("chef/knife/node_create")
-    loader.find_subcommands_via_dirglob.each { |rel_path, abs_path| expect(abs_path).to match(%r{chef/knife/.+}) }
+    loader.find_subcommands_via_dirglob.each_value { |abs_path| expect(abs_path).to match(%r{chef/knife/.+}) }
   end
 
   it "finds user-specific subcommands in the user's ~/.chef directory" do
@@ -185,7 +185,7 @@ describe Chef::Knife::SubcommandLoader::GemGlobLoader do
         expect(Gem.source_index).to receive(:latest_specs).and_call_original
       end
       loader.subcommand_files.each do |require_path|
-        expect(require_path).to match(/chef\/knife\/.*|plugins\/knife\/.*/)
+        expect(require_path).to match(%r{chef/knife/.*|plugins/knife/.*})
       end
     end
 
@@ -201,7 +201,7 @@ describe Chef::Knife::SubcommandLoader::GemGlobLoader do
           expect(Gem.source_index).to receive(:latest_specs).and_call_original
         end
         loader.subcommand_files.each do |require_path|
-          expect(require_path).to match(/chef\/knife\/.*|plugins\/knife\/.*/)
+          expect(require_path).to match(%r{chef/knife/.*|plugins/knife/.*})
         end
       end
     end

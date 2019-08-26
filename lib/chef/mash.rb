@@ -72,7 +72,7 @@ class Mash < Hash
     super
     # Handle nested values
     each do |k, v|
-      if v.kind_of?(Mash) || v.is_a?(Array)
+      if v.is_a?(Mash) || v.is_a?(Array)
         self[k] = v.dup
       end
     end
@@ -103,6 +103,12 @@ class Mash < Hash
   # @see Mash#convert_value
   def []=(key, value)
     regular_writer(convert_key(key), convert_value(value))
+  end
+
+  # internal API for use by Chef's deep merge cache
+  # @api private
+  def internal_set(key, value)
+    regular_writer(key, convert_value(value))
   end
 
   # @param other_hash<Hash>
@@ -204,7 +210,7 @@ class Mash < Hash
   #
   # @api private
   def convert_key(key)
-    key.kind_of?(Symbol) ? key.to_s : key
+    key.is_a?(Symbol) ? key.to_s : key
   end
 
   # @param value<Object> The value to convert.

@@ -16,15 +16,15 @@
 # limitations under the License.
 #
 
-require "chef/http/auth_credentials"
-require "chef/exceptions"
-require "openssl"
+require_relative "auth_credentials"
+require_relative "../exceptions"
+require "openssl" unless defined?(OpenSSL)
 
 class Chef
   class HTTP
     class Authenticator
 
-      DEFAULT_SERVER_API_VERSION = "1"
+      DEFAULT_SERVER_API_VERSION = "1".freeze
 
       attr_reader :signing_key_filename
       attr_reader :raw_key
@@ -40,7 +40,7 @@ class Chef
         @sign_request = true
         @signing_key_filename = opts[:signing_key_filename]
         @key = load_signing_key(opts[:signing_key_filename], opts[:raw_key])
-        @auth_credentials = AuthCredentials.new(opts[:client_name], @key)
+        @auth_credentials = AuthCredentials.new(opts[:client_name], @key, use_ssh_agent: opts[:ssh_agent_signing])
         @version_class = opts[:version_class]
         @api_version = opts[:api_version]
       end
@@ -89,23 +89,26 @@ class Chef
         else
           return nil
         end
-        @key = OpenSSL::PKey::RSA.new(@raw_key)
+        # Pass in '' as the passphrase to avoid OpenSSL prompting on the TTY if
+        # given an encrypted key. This also helps if using a single file for
+        # both the public and private key with ssh-agent mode.
+        @key = OpenSSL::PKey::RSA.new(@raw_key, "")
       rescue SystemCallError, IOError => e
         Chef::Log.warn "Failed to read the private key #{key_file}: #{e.inspect}"
         raise Chef::Exceptions::PrivateKeyMissing, "I cannot read #{key_file}, which you told me to use to sign requests!"
       rescue OpenSSL::PKey::RSAError
-        msg = "The file #{key_file} or :raw_key option does not contain a correctly formatted private key.\n"
+        msg = "The file #{key_file} or :raw_key option does not contain a correctly formatted private key or the key is encrypted.\n"
         msg << "The key file should begin with '-----BEGIN RSA PRIVATE KEY-----' and end with '-----END RSA PRIVATE KEY-----'"
         raise Chef::Exceptions::InvalidPrivateKey, msg
       end
 
       def authentication_headers(method, url, json_body = nil, headers = nil)
         request_params = {
-          :http_method => method,
-          :path => url.path,
-          :body => json_body,
-          :host => "#{url.host}:#{url.port}",
-          :headers => headers,
+          http_method: method,
+          path: url.path,
+          body: json_body,
+          host: "#{url.host}:#{url.port}",
+          headers: headers,
         }
         request_params[:body] ||= ""
         auth_credentials.signature_headers(request_params)

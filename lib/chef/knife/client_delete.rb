@@ -16,23 +16,22 @@
 # limitations under the License.
 #
 
-require "chef/knife"
+require_relative "../knife"
 
 class Chef
   class Knife
     class ClientDelete < Knife
 
       deps do
-        require "chef/api_client_v1"
-        require "chef/json_compat"
+        require_relative "../api_client_v1"
       end
 
       option :delete_validators,
-       :short => "-D",
-       :long => "--delete-validators",
-       :description => "Force deletion of client if it's a validator"
+        short: "-D",
+        long: "--delete-validators",
+        description: "Force deletion of client if it's a validator."
 
-      banner "knife client delete [CLIENT[,CLIENT]] (options)"
+      banner "knife client delete [CLIENT [CLIENT]] (options)"
 
       def run
         if @name_args.length == 0

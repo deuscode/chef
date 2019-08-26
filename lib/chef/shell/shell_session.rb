@@ -2,7 +2,7 @@
 # Author:: Daniel DeLeo (<dan@kallistec.com>)
 # Author:: Tim Hinderliter (<tim@chef.io>)
 # Copyright:: Copyright 2009-2016, Daniel DeLeo
-# Copyright:: Copyright 2011-2016, Chef Software Inc.
+# Copyright:: Copyright 2011-2018, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,16 +18,17 @@
 # limitations under the License.
 #
 
-require "chef/recipe"
-require "chef/run_context"
-require "chef/config"
-require "chef/client"
-require "chef/cookbook/cookbook_collection"
-require "chef/cookbook_loader"
-require "chef/run_list/run_list_expansion"
-require "chef/formatters/base"
-require "chef/formatters/doc"
-require "chef/formatters/minimal"
+require_relative "../recipe"
+require_relative "../run_context"
+require_relative "../config"
+require_relative "../client"
+require_relative "../cookbook/cookbook_collection"
+require_relative "../cookbook_loader"
+require_relative "../run_list/run_list_expansion"
+require_relative "../formatters/base"
+require_relative "../formatters/doc"
+require_relative "../formatters/minimal"
+require_relative "../dist"
 
 module Shell
   class ShellSession
@@ -38,7 +39,7 @@ module Shell
       @session_type
     end
 
-    attr_accessor :node, :compile, :recipe, :run_context
+    attr_accessor :node, :compile, :recipe, :json_configuration
     attr_reader :node_attributes, :client
     def initialize
       @node_built = false
@@ -73,6 +74,7 @@ module Shell
       run_context.resource_collection
     end
 
+    attr_writer :run_context
     def run_context
       @run_context ||= rebuild_context
     end
@@ -86,7 +88,7 @@ module Shell
     end
 
     def save_node
-      raise "Not Supported! #{self.class.name} doesn't support #save_node, maybe you need to run chef-shell in client mode?"
+      raise "Not Supported! #{self.class.name} doesn't support #save_node, maybe you need to run #{Chef::Dist::SHELL} in client mode?"
     end
 
     def rebuild_context
@@ -151,7 +153,7 @@ module Shell
 
     def rebuild_node
       Chef::Config[:solo_legacy_mode] = true
-      @client = Chef::Client.new(nil, Chef::Config[:shell_config])
+      @client = Chef::Client.new(json_configuration, Chef::Config[:shell_config])
       @client.run_ohai
       @client.load_node
       @client.build_node
@@ -183,7 +185,7 @@ module Shell
     def rebuild_node
       # Tell the client we're chef solo so it won't try to contact the server
       Chef::Config[:solo_legacy_mode] = true
-      @client = Chef::Client.new(nil, Chef::Config[:shell_config])
+      @client = Chef::Client.new(json_configuration, Chef::Config[:shell_config])
       @client.run_ohai
       @client.load_node
       @client.build_node
@@ -218,7 +220,7 @@ module Shell
     def rebuild_node
       # Make sure the client knows this is not chef solo
       Chef::Config[:solo_legacy_mode] = false
-      @client = Chef::Client.new(nil, Chef::Config[:shell_config])
+      @client = Chef::Client.new(json_configuration, Chef::Config[:shell_config])
       @client.run_ohai
       @client.register
       @client.load_node
@@ -251,20 +253,20 @@ module Shell
     # DoppelGanger implementation of build_node. preserves as many of the node's
     # attributes, and does not save updates to the server
     def build_node
-      Chef::Log.debug("Building node object for #{@node_name}")
+      Chef::Log.trace("Building node object for #{@node_name}")
       @node = Chef::Node.find_or_create(node_name)
       ohai_data = @ohai.data.merge(@node.automatic_attrs)
       @node.consume_external_attrs(ohai_data, nil)
       @run_list_expansion = @node.expand!("server")
       @expanded_run_list_with_versions = @run_list_expansion.recipes.with_version_constraints_strings
       Chef::Log.info("Run List is [#{@node.run_list}]")
-      Chef::Log.info("Run List expands to [#{@expanded_run_list_with_versions.join(', ')}]")
+      Chef::Log.info("Run List expands to [#{@expanded_run_list_with_versions.join(", ")}]")
       @node
     end
 
     def register
-      @rest = Chef::ServerAPI.new(Chef::Config[:chef_server_url], :client_name => Chef::Config[:node_name],
-                                                                  :signing_key_filename => Chef::Config[:client_key])
+      @rest = Chef::ServerAPI.new(Chef::Config[:chef_server_url], client_name: Chef::Config[:node_name],
+                                                                  signing_key_filename: Chef::Config[:client_key])
     end
 
   end

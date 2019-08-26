@@ -18,13 +18,25 @@
 # limitations under the License.
 #
 
-require "chef/resource/file"
-require "chef/provider/template"
-require "chef/mixin/securable"
+require_relative "file"
+require_relative "../mixin/securable"
+require_relative "../dist"
 
 class Chef
   class Resource
+    # A cookbook template is an Embedded Ruby (ERB) template that is used to dynamically generate static text files.
+    # Templates may contain Ruby expressions and statements, and are a great way to manage configuration files. Use the
+    # template resource to add cookbook templates to recipes; place the corresponding Embedded Ruby (ERB) template file
+    # in a cookbook's /templates directory.
+    #
+    # Use the template resource to manage the contents of a file using an Embedded Ruby (ERB) template by transferring
+    # files from a sub-directory of COOKBOOK_NAME/templates/ to a specified path located on a host that is running the
+    # chef-client. This resource includes actions and properties from the file resource. Template files managed by the
+    # template resource follow the same file specificity rules as the remote_file and file resources.
     class Template < Chef::Resource::File
+      resource_name :template
+      provides :template
+
       include Chef::Mixin::Securable
 
       attr_reader :inline_helper_blocks
@@ -33,9 +45,6 @@ class Chef
       def initialize(name, run_context = nil)
         super
         @source = "#{::File.basename(name)}.erb"
-        @cookbook = nil
-        @local = false
-        @variables = Hash.new
         @inline_helper_blocks = {}
         @inline_helper_modules = []
         @helper_modules = []
@@ -45,33 +54,21 @@ class Chef
         set_or_return(
           :source,
           file,
-          :kind_of => [ String, Array ]
+          kind_of: [ String, Array ]
         )
       end
 
-      def variables(args = nil)
-        set_or_return(
-          :variables,
-          args,
-          :kind_of => [ Hash ]
-        )
-      end
+      property :variables, Hash,
+        description: "The variables property of the template resource can be used to reference a partial template file by using a Hash.",
+        default: lazy { {} }
 
-      def cookbook(args = nil)
-        set_or_return(
-          :cookbook,
-          args,
-          :kind_of => [ String ]
-        )
-      end
+      property :cookbook, String,
+        description: "The cookbook in which a file is located (if it is not located in the current cookbook). The default value is the current cookbook.",
+        desired_state: false
 
-      def local(args = nil)
-        set_or_return(
-          :local,
-          args,
-          :kind_of => [ TrueClass, FalseClass ]
-        )
-      end
+      property :local, [ TrueClass, FalseClass ],
+        default: false, desired_state: false,
+        description: "Load a template from a local path. By default, the #{Chef::Dist::CLIENT} loads templates from a cookbook’s /templates directory. When this property is set to true, use the source property to specify the path to a template on the local node."
 
       # Declares a helper method to be defined in the template context when
       # rendering.
@@ -112,7 +109,7 @@ class Chef
             "`helper(:method)` requires a block argument (e.g., `helper(:method) { code }`)"
         end
 
-        unless method_name.kind_of?(Symbol)
+        unless method_name.is_a?(Symbol)
           raise Exceptions::ValidationFailed,
             "method_name argument to `helper(method_name)` must be a symbol (e.g., `helper(:method) { code }`)"
         end
@@ -166,7 +163,7 @@ class Chef
             "Passing both a module and block to #helpers is not supported. Call #helpers multiple times instead"
         elsif block_given?
           @inline_helper_modules << block
-        elsif module_name.kind_of?(::Module)
+        elsif module_name.is_a?(::Module)
           @helper_modules << module_name
         elsif module_name.nil?
           raise Exceptions::ValidationFailed,

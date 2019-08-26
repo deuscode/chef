@@ -17,8 +17,8 @@
 # limitations under the License.
 #
 
-require "chef/knife"
-require "chef/knife/data_bag_secret_options"
+require_relative "../knife"
+require_relative "data_bag_secret_options"
 
 class Chef
   class Knife
@@ -26,8 +26,8 @@ class Chef
       include DataBagSecretOptions
 
       deps do
-        require "chef/data_bag"
-        require "chef/encrypted_data_bag_item"
+        require_relative "../data_bag"
+        require_relative "../encrypted_data_bag_item"
       end
 
       banner "knife data bag create BAG [ITEM] (options)"
@@ -53,8 +53,9 @@ class Chef
         begin
           rest.get("data/#{@data_bag_name}")
           ui.info("Data bag #{@data_bag_name} already exists")
-        rescue Net::HTTPServerException => e
+        rescue Net::HTTPClientException => e
           raise unless e.to_s =~ /^404/
+
           # if it doesn't exists, try to create it
           rest.post("data", { "name" => @data_bag_name })
           ui.info("Created data_bag[#{@data_bag_name}]")

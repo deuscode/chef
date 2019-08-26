@@ -7,6 +7,7 @@ tags
 *~
 .chef
 results
+*.swp
 
 # You should check in your Gemfile.lock in applications, and not in gems
 external_tests/*.lock
@@ -25,6 +26,7 @@ binstubs/
 
 # IDE files
 .project
+.idea
 
 # Documentation
 _site/*
@@ -38,17 +40,35 @@ doc/
 Vagrantfile
 .vagrant/
 
-# Kitchen Tests Local Mode Data
+# Kitchen Tests lock files and chef data
 kitchen-tests/nodes/*
+kitchen-tests/Gemfile.lock
+kitchen-tests/Berksfile.lock
 
 # Temporary files present during spec runs
 spec/data/test-dir
 spec/data/nodes
+spec/data/chef_guid
 /config/
 
-# acceptance binstubs
-acceptance/bin/*
-
 vendor/
-acceptance/vendor
 kitchen-tests/vendor
+
+# Visual Studio Code files
+.vscode
+
+# ignore nodes generated during local testing
+nodes/
+
+# chef-config
+chef-config/.bundle
+chef-config/Gemfile.lock
+chef-config/pkg
+
+# chef-bin
+chef-bin/.bundle
+chef-bin/Gemfile.lock
+chef-bin/pkg
+
+# auto generated docs from the docs.rb rake task
+docs_site

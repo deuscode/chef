@@ -40,7 +40,7 @@ describe Chef::Resource::Service, :requires_root, :aix_only do
     directory = []
     if priority.is_a? Hash
       priority.each do |level, o|
-        directory << "/etc/rc.d/rc#{level}.d/#{(o[0] == :start ? 'S' : 'K')}#{o[1]}#{new_resource.service_name}"
+        directory << "/etc/rc.d/rc#{level}.d/#{(o[0] == :start ? "S" : "K")}#{o[1]}#{new_resource.service_name}"
       end
       directory
     else
@@ -59,7 +59,7 @@ describe Chef::Resource::Service, :requires_root, :aix_only do
   let(:new_resource) do
     new_resource = Chef::Resource::Service.new("chefinittest", run_context)
     new_resource.provider Chef::Provider::Service::AixInit
-    new_resource.supports({ :status => true, :restart => true, :reload => true })
+    new_resource.supports({ status: true, restart: true, reload: true })
     new_resource
   end
 
@@ -70,7 +70,7 @@ describe Chef::Resource::Service, :requires_root, :aix_only do
 
   before(:all) do
     File.delete("/etc/rc.d/init.d/chefinittest") if File.exists?("/etc/rc.d/init.d/chefinittest")
-    FileUtils.cp("#{File.join(File.dirname(__FILE__), "/../assets/chefinittest")}", "/etc/rc.d/init.d/chefinittest")
+    FileUtils.cp((File.join(File.dirname(__FILE__), "/../assets/chefinittest")).to_s, "/etc/rc.d/init.d/chefinittest")
   end
 
   after(:all) do

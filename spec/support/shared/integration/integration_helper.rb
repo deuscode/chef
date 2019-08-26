@@ -111,6 +111,7 @@ module IntegrationSupport
   RSpec.shared_context "with a chef repo" do
     before :each do
       raise "Can only create one directory per test" if @repository_dir
+
       @repository_dir = Dir.mktmpdir("chef_repo")
       Chef::Config.chef_repo_path = @repository_dir
       %w{client cookbook data_bag environment node role user}.each do |object_name|
@@ -140,12 +141,12 @@ module IntegrationSupport
 
   # Versioned cookbooks
 
-  RSpec.shared_context "with versioned cookbooks", :versioned_cookbooks => true do
+  RSpec.shared_context "with versioned cookbooks", versioned_cookbooks: true do
     before(:each) { Chef::Config[:versioned_cookbooks] = true }
     after(:each)  { Chef::Config.delete(:versioned_cookbooks) }
   end
 
-  RSpec.shared_context "without versioned cookbooks", :versioned_cookbooks => false do
+  RSpec.shared_context "without versioned cookbooks", versioned_cookbooks: false do
     # Just make sure this goes back to default
     before(:each) { Chef::Config[:versioned_cookbooks] = false }
     after(:each)  { Chef::Config.delete(:versioned_cookbooks) }

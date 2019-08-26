@@ -16,12 +16,10 @@
 # limitations under the License.
 #
 
-require "chef/resource"
-require "chef/dsl/declare_resource"
-require "chef/mixin/shell_out"
-require "chef/mixin/which"
-require "chef/http/simple"
-require "chef/provider/noop"
+require_relative "../resource"
+require_relative "../dsl/declare_resource"
+require_relative "../mixin/which"
+require_relative "noop"
 
 class Chef
   class Provider
@@ -32,8 +30,7 @@ class Chef
         which "yum"
       end
 
-      def load_current_resource
-      end
+      def load_current_resource; end
 
       action :create do
         declare_resource(:template, "/etc/yum.repos.d/#{new_resource.repositoryid}.repo") do
@@ -49,7 +46,7 @@ class Chef
           if new_resource.make_cache
             notifies :run, "execute[yum clean metadata #{new_resource.repositoryid}]", :immediately if new_resource.clean_metadata || new_resource.clean_headers
             notifies :run, "execute[yum-makecache-#{new_resource.repositoryid}]", :immediately
-            notifies :create, "ruby_block[yum-cache-reload-#{new_resource.repositoryid}]", :immediately
+            notifies :create, "ruby_block[package-cache-reload-#{new_resource.repositoryid}]", :immediately
           end
         end
 
@@ -65,9 +62,14 @@ class Chef
           only_if { new_resource.enabled }
         end
 
-        # reload internal Chef yum cache
-        declare_resource(:ruby_block, "yum-cache-reload-#{new_resource.repositoryid}") do
-          block { Chef::Provider::Package::Yum::YumCache.instance.reload }
+        # reload internal Chef yum/dnf cache
+        declare_resource(:ruby_block, "package-cache-reload-#{new_resource.repositoryid}") do
+          if ( platform?("fedora") && node["platform_version"].to_i >= 22 ) ||
+              ( platform_family?("rhel") && node["platform_version"].to_i >= 8 )
+            block { Chef::Provider::Package::Dnf::PythonHelper.instance.restart }
+          else
+            block { Chef::Provider::Package::Yum::YumCache.instance.reload }
+          end
           action :nothing
         end
       end
@@ -81,11 +83,16 @@ class Chef
 
         declare_resource(:file, "/etc/yum.repos.d/#{new_resource.repositoryid}.repo") do
           action :delete
-          notifies :create, "ruby_block[yum-cache-reload-#{new_resource.repositoryid}]", :immediately
+          notifies :create, "ruby_block[package-cache-reload-#{new_resource.repositoryid}]", :immediately
         end
 
-        declare_resource(:ruby_block, "yum-cache-reload-#{new_resource.repositoryid}") do
-          block { Chef::Provider::Package::Yum::YumCache.instance.reload }
+        declare_resource(:ruby_block, "package-cache-reload-#{new_resource.repositoryid}") do
+          if ( platform?("fedora") && node["platform_version"].to_i >= 22 ) ||
+              ( platform_family?("rhel") && node["platform_version"].to_i >= 8 )
+            block { Chef::Provider::Package::Dnf::PythonHelper.instance.restart }
+          else
+            block { Chef::Provider::Package::Yum::YumCache.instance.reload }
+          end
           action :nothing
         end
       end
@@ -97,8 +104,13 @@ class Chef
           only_if { new_resource.enabled }
         end
 
-        declare_resource(:ruby_block, "yum-cache-reload-#{new_resource.repositoryid}") do
-          block { Chef::Provider::Package::Yum::YumCache.instance.reload }
+        declare_resource(:ruby_block, "package-cache-reload-#{new_resource.repositoryid}") do
+          if ( platform?("fedora") && node["platform_version"].to_i >= 22 ) ||
+              ( platform_family?("rhel") && node["platform_version"].to_i >= 8 )
+            block { Chef::Provider::Package::Dnf::PythonHelper.instance.restart }
+          else
+            block { Chef::Provider::Package::Yum::YumCache.instance.reload }
+          end
           action :run
         end
       end

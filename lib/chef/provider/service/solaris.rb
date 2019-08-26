@@ -16,8 +16,8 @@
 # limitations under the License.
 #
 
-require "chef/provider/service"
-require "chef/resource/service"
+require_relative "../service"
+require_relative "../../resource/service"
 
 class Chef
   class Provider
@@ -31,7 +31,7 @@ class Chef
           super
           @init_command   = "/usr/sbin/svcadm"
           @status_command = "/bin/svcs"
-          @maintenace     = false
+          @maintenance    = false
         end
 
         def load_current_resource
@@ -54,6 +54,8 @@ class Chef
         end
 
         def enable_service
+          # Running service status to update maintenance status to invoke svcadm clear
+          service_status
           shell_out!(default_init_command, "clear", @new_resource.service_name) if @maintenance
           enable_flags = [ "-s", @new_resource.options ].flatten.compact
           shell_out!(default_init_command, "enable", *enable_flags, @new_resource.service_name)
@@ -78,7 +80,7 @@ class Chef
         end
 
         def service_status
-          cmd = shell_out!(@status_command, "-l", @current_resource.service_name, :returns => [0, 1])
+          cmd = shell_out!(@status_command, "-l", @current_resource.service_name, returns: [0, 1])
           # Example output
           # $ svcs -l rsyslog
           # fmri         svc:/application/rsyslog:default
@@ -93,6 +95,9 @@ class Chef
           # dependency   require_all/error svc:/milestone/multi-user:default (online)
           # $
 
+          # Set the default value for maintenance
+          @maintenance = false
+
           # load output into hash
           status = {}
           cmd.stdout.each_line do |line|
@@ -101,7 +106,6 @@ class Chef
           end
 
           # check service state
-          @maintenance = false
           case status["state"]
           when "online"
             @current_resource.enabled(true)

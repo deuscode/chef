@@ -16,9 +16,9 @@
 # limitations under the License.
 #
 
-require "uri"
-require "tempfile"
-require "chef/provider/remote_file"
+require "uri" unless defined?(URI)
+require "tempfile" unless defined?(Tempfile)
+require_relative "../remote_file"
 
 class Chef
   class Provider
@@ -35,7 +35,7 @@ class Chef
 
         # CHEF-4472: Remove the leading slash from windows paths that we receive from a file:// URI
         def fix_windows_path(path)
-          path.gsub(/^\/([a-zA-Z]:)/, '\1')
+          path.gsub(%r{^/([a-zA-Z]:)}, '\1')
         end
 
         def source_path
@@ -48,7 +48,7 @@ class Chef
         # Fetches the file at uri, returning a Tempfile-like File handle
         def fetch
           tempfile = Chef::FileContentManagement::Tempfile.new(new_resource).tempfile
-          Chef::Log.debug("#{new_resource} staging #{source_path} to #{tempfile.path}")
+          Chef::Log.trace("#{new_resource} staging #{source_path} to #{tempfile.path}")
           FileUtils.cp(source_path, tempfile.path)
           tempfile.close if tempfile
           tempfile

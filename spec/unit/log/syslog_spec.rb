@@ -17,11 +17,9 @@
 #
 
 require "spec_helper"
-require "chef"
 
-describe "Chef::Log::Syslog", :unix_only => true do
+describe "Chef::Log::Syslog", unix_only: true do
   let(:syslog) { Chef::Log::Syslog.new }
-  let(:app) { Chef::Application.new }
 
   before do
     Chef::Log.init(MonoLogger.new(syslog))
@@ -37,13 +35,13 @@ describe "Chef::Log::Syslog", :unix_only => true do
   end
 
   it "should send message with severity info to syslog." do
-    expect(syslog).to receive(:info).with("*** Chef 12.4.0.dev.0 ***")
+    expect(syslog).to receive(:add).with(1, "*** Chef 12.4.0.dev.0 ***", nil)
     Chef::Log.info("*** Chef 12.4.0.dev.0 ***")
   end
 
   it "should send message with severity warning to syslog." do
-    expect(syslog).to receive(:warn).with("No config file found or specified on command line, using command line options.")
-    Chef::Log.warn("No config file found or specified on command line, using command line options.")
+    expect(syslog).to receive(:add).with(2, "No config file found or specified on command line. Using command line options instead.", nil)
+    Chef::Log.warn("No config file found or specified on command line. Using command line options instead.")
   end
 
   it "should fallback into send message with severity info to syslog when wrong format." do

@@ -23,7 +23,7 @@ describe Chef::Knife::ClientDelete do
     @knife = Chef::Knife::ClientDelete.new
     # defaults
     @knife.config = {
-      :delete_validators => false,
+      delete_validators: false,
     }
     @knife.name_args = [ "adam" ]
   end
@@ -35,7 +35,7 @@ describe Chef::Knife::ClientDelete do
     end
 
     context "receives multiple clients" do
-      let(:clients) { %w{ "adam", "ben", "charlie" } }
+      let(:clients) { %w{ adam ben charlie } }
 
       before(:each) do
         @knife.name_args = clients

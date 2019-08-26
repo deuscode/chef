@@ -16,17 +16,17 @@
 # limitations under the License.
 #
 
-require "chef/log"
-require "chef/provider"
-require "chef/resource"
-require "chef/resource/file"
+require_relative "../log"
+require_relative "../provider"
+require_relative "../resource"
+require_relative "../resource/file"
 require "uuidtools"
 
 class Chef
   class Provider
     class OsxProfile < Chef::Provider
-      provides :osx_profile, os: "darwin"
-      provides :osx_config_profile, os: "darwin"
+      provides :osx_profile
+      provides :osx_config_profile
 
       def load_current_resource
         @current_resource = Chef::Resource::OsxProfile.new(new_resource.name)
@@ -68,7 +68,7 @@ class Chef
                 !@new_profile_identifier.end_with?(".mobileconfig") &&
                 /^\w+(?:(\.| )\w+)+$/.match(@new_profile_identifier)
             end
-            a.failure_message RuntimeError, "when removing using the identifier attribute, it must match the profile identifier"
+            a.failure_message RuntimeError, "when removing using the identifier property, it must match the profile identifier"
           else
             new_profile_name = new_resource.profile_name
             a.assertion do
@@ -188,16 +188,16 @@ class Chef
       end
 
       def install_profile(profile_path)
-        cmd = "profiles -I -F '#{profile_path}'"
-        Chef::Log.debug("cmd: #{cmd}")
-        shellout_results = shell_out(cmd)
+        cmd = [ "/usr/bin/profiles", "-I", "-F", profile_path ]
+        logger.trace("cmd: #{cmd.join(" ")}")
+        shellout_results = shell_out(*cmd)
         shellout_results.exitstatus
       end
 
       def remove_profile
-        cmd = "profiles -R -p '#{@new_profile_identifier}'"
-        Chef::Log.debug("cmd: #{cmd}")
-        shellout_results = shell_out(cmd)
+        cmd = [ "/usr/bin/profiles", "-R", "-p", @new_profile_identifier ]
+        logger.trace("cmd: #{cmd.join(" ")}")
+        shellout_results = shell_out(*cmd)
         shellout_results.exitstatus
       end
 
@@ -214,7 +214,7 @@ class Chef
         tempfile = generate_tempfile
         write_installed_profiles(tempfile)
         installed_profiles = read_plist(tempfile)
-        Chef::Log.debug("Saved profiles to run_state")
+        logger.trace("Saved profiles to run_state")
         # Clean up the temp file as we do not need it anymore
         ::File.unlink(tempfile)
         installed_profiles
@@ -225,8 +225,7 @@ class Chef
       end
 
       def write_installed_profiles(tempfile)
-        cmd = "profiles -P -o '#{tempfile}'"
-        shell_out!(cmd)
+        shell_out!( "/usr/bin/profiles", "-P", "-o", tempfile )
       end
 
       def read_plist(xml_file)

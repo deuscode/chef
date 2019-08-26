@@ -16,7 +16,7 @@ describe "LWRPs with inline resources" do
   # machine that has omnibus chef installed. In that case we need to ensure
   # we're running `chef-client` from the source tree and not the external one.
   # cf. CHEF-4914
-  let(:chef_client) { "ruby '#{chef_dir}/chef-client' --minimal-ohai" }
+  let(:chef_client) { "bundle exec chef-client --minimal-ohai" }
 
   context "with a use_inline_resources provider with 'def action_a' instead of action :a" do
     class LwrpInlineResourcesTest < Chef::Resource
@@ -53,7 +53,7 @@ describe "LWRPs with inline resources" do
       action :fiddle do
         file PATH do
           content new_resource.content
-          action [:create, :delete]
+          action %i{create delete}
         end
       end
     end
@@ -105,9 +105,9 @@ describe "LWRPs with inline resources" do
         r = lwrp_inline_resources_test2 "hi" do
           action :b
         end
-      end.to have_updated("lwrp_inline_resources_test2[hi]", :b).
-        and have_updated("ruby_block[run a]", :run).
-        and have_updated("ruby_block[run b]", :run)
+      end.to have_updated("lwrp_inline_resources_test2[hi]", :b)
+        .and have_updated("ruby_block[run a]", :run)
+        .and have_updated("ruby_block[run b]", :run)
       expect(r.ran_b).to eq "ran b: ran_a value was \"ran a\""
     end
   end
@@ -145,14 +145,14 @@ describe "LWRPs with inline resources" do
     end
 
     it "should complete with success" do
-      file "config/client.rb", <<EOM
-local_mode true
-cookbook_path "#{path_to('cookbooks')}"
-log_level :warn
-EOM
+      file "config/client.rb", <<~EOM
+        local_mode true
+        cookbook_path "#{path_to("cookbooks")}"
+        log_level :warn
+      EOM
 
-      result = shell_out("#{chef_client} -c \"#{path_to('config/client.rb')}\" --no-color -F doc -o 'x::default'", :cwd => chef_dir)
-      actual = result.stdout.lines.map { |l| l.chomp }.join("\n")
+      result = shell_out("#{chef_client} -c \"#{path_to("config/client.rb")}\" --no-color -F doc -o 'x::default'", cwd: chef_dir)
+      actual = result.stdout.lines.map(&:chomp).join("\n")
       expected = <<EOM
   * x_my_machine[me] action create
     * x_do_nothing[a] action create (up to date)
@@ -163,7 +163,7 @@ EOM
     * x_do_nothing[b] action create (up to date)
      (up to date)
 EOM
-      expected = expected.lines.map { |l| l.chomp }.join("\n")
+      expected = expected.lines.map(&:chomp).join("\n")
       expect(actual).to include(expected)
       result.error!
     end

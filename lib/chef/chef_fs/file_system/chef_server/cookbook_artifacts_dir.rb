@@ -16,8 +16,8 @@
 # limitations under the License.
 #
 
-require "chef/chef_fs/file_system/chef_server/cookbooks_dir"
-require "chef/chef_fs/file_system/chef_server/cookbook_artifact_dir"
+require_relative "cookbooks_dir"
+require_relative "cookbook_artifact_dir"
 
 class Chef
   module ChefFS
@@ -44,7 +44,7 @@ class Chef
               result = []
               root.get_json("#{api_path}/?num_versions=all").each_pair do |cookbook_name, cookbooks|
                 cookbooks["versions"].each do |cookbook_version|
-                  result << CookbookArtifactDir.new("#{cookbook_name}-#{cookbook_version['identifier']}", self)
+                  result << CookbookArtifactDir.new("#{cookbook_name}-#{cookbook_version["identifier"]}", self)
                 end
               end
               result.sort_by(&:name)

@@ -16,9 +16,10 @@
 # limitations under the License.
 #
 
-require "chef/run_list"
-require "chef/util/path_helper"
-require "pathname"
+require_relative "../../run_list"
+require_relative "../../util/path_helper"
+require "pathname" unless defined?(Pathname)
+require_relative "../../dist"
 
 class Chef
   class Knife
@@ -45,7 +46,7 @@ class Chef
         end
 
         def validation_key
-          if @chef_config.has_key?(:validation_key) &&
+          if @chef_config[:validation_key] &&
               File.exist?(File.expand_path(@chef_config[:validation_key]))
             IO.read(File.expand_path(@chef_config[:validation_key]))
           else
@@ -62,7 +63,7 @@ class Chef
         end
 
         # Contains commands and content, see trusted_certs_content
-        # TODO: Rename to trusted_certs_script
+        # @todo Rename to trusted_certs_script
         def trusted_certs
           @trusted_certs ||= trusted_certs_content
         end
@@ -86,12 +87,16 @@ class Chef
         end
 
         def config_content
-          client_rb = <<-CONFIG
-chef_server_url  "#{@chef_config[:chef_server_url]}"
-validation_client_name "#{@chef_config[:validation_client_name]}"
+          client_rb = <<~CONFIG
+            chef_server_url  "#{@chef_config[:chef_server_url]}"
+            validation_client_name "#{@chef_config[:validation_client_name]}"
           CONFIG
 
-          if !(@chef_config[:config_log_level].nil? || @chef_config[:config_log_level].empty?)
+          unless @chef_config[:chef_license].nil?
+            client_rb << "chef_license \"#{@chef_config[:chef_license]}\"\n"
+          end
+
+          unless @chef_config[:config_log_level].nil? || @chef_config[:config_log_level].empty?
             client_rb << %Q{log_level   :#{@chef_config[:config_log_level]}\n}
           end
 
@@ -105,14 +110,14 @@ validation_client_name "#{@chef_config[:validation_client_name]}"
 
           # We configure :verify_api_cert only when it's overridden on the CLI
           # or when specified in the knife config.
-          if !@config[:node_verify_api_cert].nil? || knife_config.has_key?(:verify_api_cert)
+          if !@config[:node_verify_api_cert].nil? || knife_config.key?(:verify_api_cert)
             value = @config[:node_verify_api_cert].nil? ? knife_config[:verify_api_cert] : @config[:node_verify_api_cert]
             client_rb << %Q{verify_api_cert #{value}\n}
           end
 
           # We configure :ssl_verify_mode only when it's overridden on the CLI
           # or when specified in the knife config.
-          if @config[:node_ssl_verify_mode] || knife_config.has_key?(:ssl_verify_mode)
+          if @config[:node_ssl_verify_mode] || knife_config.key?(:ssl_verify_mode)
             value = case @config[:node_ssl_verify_mode]
                     when "peer"
                       :verify_peer
@@ -153,22 +158,15 @@ validation_client_name "#{@chef_config[:validation_client_name]}"
           end
 
           if encrypted_data_bag_secret
-            client_rb << %Q{encrypted_data_bag_secret "/etc/chef/encrypted_data_bag_secret"\n}
+            client_rb << %Q{encrypted_data_bag_secret "#{Chef::Dist::CONF_DIR}/encrypted_data_bag_secret"\n}
           end
 
           unless trusted_certs.empty?
-            client_rb << %Q{trusted_certs_dir "/etc/chef/trusted_certs"\n}
+            client_rb << %Q{trusted_certs_dir "#{Chef::Dist::CONF_DIR}/trusted_certs"\n}
           end
 
           if Chef::Config[:fips]
-            client_rb << <<-CONFIG.gsub(/^ {14}/, "")
-              fips true
-              require "chef/version"
-              chef_version = ::Chef::VERSION.split(".")
-              unless chef_version[0].to_i > 12 || (chef_version[0].to_i == 12 && chef_version[1].to_i >= 8)
-                raise "FIPS Mode requested but not supported by this client"
-              end
-            CONFIG
+            client_rb << "fips true\n"
           end
 
           client_rb
@@ -176,9 +174,13 @@ validation_client_name "#{@chef_config[:validation_client_name]}"
 
         def start_chef
           # If the user doesn't have a client path configure, let bash use the PATH for what it was designed for
-          client_path = @chef_config[:chef_client_path] || "chef-client"
-          s = "#{client_path} -j /etc/chef/first-boot.json"
-          s << " -l debug" if @config[:verbosity] && @config[:verbosity] >= 2
+          client_path = @chef_config[:chef_client_path] || "#{Chef::Dist::CLIENT}"
+          s = "#{client_path} -j #{Chef::Dist::CONF_DIR}/first-boot.json"
+          if @config[:verbosity] && @config[:verbosity] >= 3
+            s << " -l trace"
+          elsif @config[:verbosity] && @config[:verbosity] >= 2
+            s << " -l debug"
+          end
           s << " -E #{bootstrap_environment}" unless bootstrap_environment.nil?
           s << " --no-color" unless @config[:color]
           s
@@ -189,29 +191,17 @@ validation_client_name "#{@chef_config[:validation_client_name]}"
         end
 
         #
-        # chef version string to fetch the latest current version from omnitruck
-        # If user is on X.Y.Z bootstrap will use the latest X release
-        # X here can be 10 or 11
-        def latest_current_chef_version_string
-          installer_version_string = nil
-          if @config[:prerelease]
-            installer_version_string = ["-p"]
+        # Returns the version of Chef to install (as recognized by the Omnitruck API)
+        #
+        # @return [String] download version string
+        def version_to_install
+          return knife_config[:bootstrap_version] if knife_config[:bootstrap_version]
+
+          if @config[:channel] == "stable"
+            Chef::VERSION.split(".").first
           else
-            chef_version_string = if knife_config[:bootstrap_version]
-                                    knife_config[:bootstrap_version]
-                                  else
-                                    Chef::VERSION.split(".").first
-                                  end
-
-            installer_version_string = ["-v", chef_version_string]
-
-            # If bootstrapping a pre-release version add -p to the installer string
-            if chef_version_string.split(".").length > 3
-              installer_version_string << "-p"
-            end
+            "latest"
           end
-
-          installer_version_string.join(" ")
         end
 
         def first_boot
@@ -223,7 +213,8 @@ validation_client_name "#{@chef_config[:validation_client_name]}"
               attributes[:run_list] = @run_list
             end
 
-            attributes.merge!(:tags => @config[:tags]) if @config[:tags] && !@config[:tags].empty?
+            attributes.delete(:run_list) if attributes[:policy_name] && !attributes[:policy_name].empty?
+            attributes.merge!(tags: @config[:tags]) if @config[:tags] && !@config[:tags].empty?
           end
         end
 
@@ -235,7 +226,7 @@ validation_client_name "#{@chef_config[:validation_client_name]}"
           content = ""
           if @chef_config[:trusted_certs_dir]
             Dir.glob(File.join(Chef::Util::PathHelper.escape_glob_dir(@chef_config[:trusted_certs_dir]), "*.{crt,pem}")).each do |cert|
-              content << "cat > /etc/chef/trusted_certs/#{File.basename(cert)} <<'EOP'\n" +
+              content << "cat > #{Chef::Dist::CONF_DIR}/trusted_certs/#{File.basename(cert)} <<'EOP'\n" +
                 IO.read(File.expand_path(cert)) + "\nEOP\n"
             end
           end
@@ -249,12 +240,12 @@ validation_client_name "#{@chef_config[:validation_client_name]}"
             root.find do |f|
               relative = f.relative_path_from(root)
               if f != root
-                file_on_node = "/etc/chef/client.d/#{relative}"
+                file_on_node = "#{Chef::Dist::CONF_DIR}/client.d/#{relative}"
                 if f.directory?
                   content << "mkdir #{file_on_node}\n"
                 else
                   content << "cat > #{file_on_node} <<'EOP'\n" +
-                    f.read + "\nEOP\n"
+                    f.read.gsub("'", "'\\\\''") + "\nEOP\n"
                 end
               end
             end

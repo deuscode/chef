@@ -25,12 +25,12 @@ describe Chef::Knife::RoleFromFile do
     Chef::Config[:node_name] = "webmonkey.example.com"
     @knife = Chef::Knife::RoleFromFile.new
     @knife.config = {
-      :print_after => nil,
+      print_after: nil,
     }
     @knife.name_args = [ "adam.rb" ]
     allow(@knife).to receive(:output).and_return(true)
     allow(@knife).to receive(:confirm).and_return(true)
-    @role = Chef::Role.new()
+    @role = Chef::Role.new
     allow(@role).to receive(:save)
     allow(@knife.loader).to receive(:load_from).and_return(@role)
     @stdout = StringIO.new

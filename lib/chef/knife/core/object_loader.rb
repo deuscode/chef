@@ -16,9 +16,9 @@
 # limitations under the License.
 #
 
-require "ffi_yajl"
-require "chef/util/path_helper"
-require "chef/data_bag_item"
+require "ffi_yajl" unless defined?(FFI_Yajl)
+require_relative "../../util/path_helper"
+require_relative "../../data_bag_item"
 
 class Chef
   class Knife
@@ -40,7 +40,7 @@ class Chef
 
         def load_from(repo_location, *components)
           unless object_file = find_file(repo_location, *components)
-            ui.error "Could not find or open file '#{components.last}' in current directory or in '#{repo_location}/#{components.join('/')}'"
+            ui.error "Could not find or open file '#{components.last}' in current directory or in '#{repo_location}/#{components.join("/")}'"
             exit 1
           end
           object_from_file(object_file)

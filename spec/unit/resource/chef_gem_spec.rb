@@ -34,15 +34,29 @@ end
 describe Chef::Resource::ChefGem, "gem_binary" do
   let(:resource) { Chef::Resource::ChefGem.new("foo") }
 
-  it "should raise an exception when gem_binary is set" do
+  it "sets the default action as :install" do
+    expect(resource.action).to eql([:install])
+  end
+
+  it "supports :install, :lock, :purge, :reconfig, :remove, :unlock, :upgrade actions" do
+    expect { resource.action :install }.not_to raise_error
+    expect { resource.action :lock }.not_to raise_error
+    expect { resource.action :purge }.not_to raise_error
+    expect { resource.action :reconfig }.not_to raise_error
+    expect { resource.action :remove }.not_to raise_error
+    expect { resource.action :unlock }.not_to raise_error
+    expect { resource.action :upgrade }.not_to raise_error
+  end
+
+  it "raises an exception when gem_binary is set" do
     expect { resource.gem_binary("/lol/cats/gem") }.to raise_error(ArgumentError)
   end
 
-  it "should set the gem_binary based on computing it from RbConfig" do
-    expect(resource.gem_binary).to eql("#{RbConfig::CONFIG['bindir']}/gem")
+  it "sets the gem_binary based on computing it from RbConfig" do
+    expect(resource.gem_binary).to eql("#{RbConfig::CONFIG["bindir"]}/gem")
   end
 
-  it "should set compile_time to false by default" do
+  it "sets compile_time to false by default" do
     expect(resource.compile_time).to be false
   end
 
@@ -59,10 +73,7 @@ describe Chef::Resource::ChefGem, "gem_binary" do
       Chef::Recipe.new("hjk", "test", run_context)
     end
 
-    let(:chef_gem_compile_time) { nil }
-
     let(:resource) do
-      Chef::Config[:chef_gem_compile_time] = chef_gem_compile_time
       Chef::Resource::ChefGem.new("foo", run_context)
     end
 

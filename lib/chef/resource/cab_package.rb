@@ -1,6 +1,6 @@
 #
 # Author:: Vasundhara Jagdale (<vasundhara.jagdale@msystechnologies.com>)
-# Copyright:: Copyright 2008-2016, Chef Software, Inc.
+# Copyright:: Copyright 2008-2019, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,29 +16,30 @@
 # limitations under the License.
 #
 
-require "chef/resource/package"
-require "chef/mixin/uris"
+require_relative "package"
+require_relative "../mixin/uris"
 
 class Chef
   class Resource
     class CabPackage < Chef::Resource::Package
       include Chef::Mixin::Uris
 
-      provides :cab_package, os: "windows"
+      resource_name :cab_package
+      provides :cab_package
+
+      description "Use the cab_package resource to install or remove Microsoft Windows cabinet (.cab) packages."
+      introduced "12.15"
 
       allowed_actions :install, :remove
 
-      def initialize(name, run_context = nil)
-        super
-        @resource_name = :cab_package
-      end
-
-      property  :source, String,
-                coerce: (proc do |s|
-                  unless s.nil?
-                    uri_scheme?(s) ? s : Chef::Util::PathHelper.canonical_path(s, false)
-                  end
-                end)
+      property :source, String,
+        description: "The local file path or URL for the CAB package.",
+        coerce: (proc do |s|
+          unless s.nil?
+            uri_scheme?(s) ? s : Chef::Util::PathHelper.canonical_path(s, false)
+          end
+        end),
+        default: lazy { package_name }, default_description: "The package name."
     end
   end
 end

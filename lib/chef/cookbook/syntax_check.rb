@@ -1,4 +1,3 @@
-#
 # Author:: Daniel DeLeo (<dan@chef.io>)
 # Copyright:: Copyright 2010-2016, Chef Software Inc.
 # License:: Apache License, Version 2.0
@@ -16,12 +15,12 @@
 # limitations under the License.
 #
 
-require "pathname"
-require "stringio"
-require "erubis"
-require "chef/mixin/shell_out"
-require "chef/mixin/checksum"
-require "chef/util/path_helper"
+require "pathname" unless defined?(Pathname)
+require "stringio" unless defined?(StringIO)
+require "erubis" unless defined?(Erubis)
+require_relative "../mixin/shell_out"
+require_relative "../mixin/checksum"
+require_relative "../util/path_helper"
 
 class Chef
   class Cookbook
@@ -63,6 +62,7 @@ class Chef
 
         def ensure_cache_path_created
           return true if @cache_path_created
+
           FileUtils.mkdir_p(cache_path)
           @cache_path_created = true
         end
@@ -87,6 +87,7 @@ class Chef
         unless cookbook_path
           raise ArgumentError, "Cannot find cookbook #{cookbook_name} unless Chef::Config.cookbook_path is set or an explicit cookbook path is given"
         end
+
         new(File.join(cookbook_path, cookbook_name.to_s))
       end
 
@@ -124,7 +125,7 @@ class Chef
       def untested_ruby_files
         ruby_files.reject do |file|
           if validated?(file)
-            Chef::Log.debug("Ruby file #{file} is unchanged, skipping syntax check")
+            Chef::Log.trace("Ruby file #{file} is unchanged, skipping syntax check")
             true
           else
             false
@@ -139,7 +140,7 @@ class Chef
       def untested_template_files
         template_files.reject do |file|
           if validated?(file)
-            Chef::Log.debug("Template #{file} is unchanged, skipping syntax check")
+            Chef::Log.trace("Template #{file} is unchanged, skipping syntax check")
             true
           else
             false
@@ -158,6 +159,7 @@ class Chef
       def validate_ruby_files
         untested_ruby_files.each do |ruby_file|
           return false unless validate_ruby_file(ruby_file)
+
           validated(ruby_file)
         end
       end
@@ -165,17 +167,18 @@ class Chef
       def validate_templates
         untested_template_files.each do |template|
           return false unless validate_template(template)
+
           validated(template)
         end
       end
 
       def validate_template(erb_file)
-        Chef::Log.debug("Testing template #{erb_file} for syntax errors...")
+        Chef::Log.trace("Testing template #{erb_file} for syntax errors...")
         validate_erb_file_inline(erb_file)
       end
 
       def validate_ruby_file(ruby_file)
-        Chef::Log.debug("Testing #{ruby_file} for syntax errors...")
+        Chef::Log.trace("Testing #{ruby_file} for syntax errors...")
         validate_ruby_file_inline(ruby_file)
       end
 
